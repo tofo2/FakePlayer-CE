@@ -292,7 +292,10 @@ public class Fakeplayer {
         var from = this.player.getLocation();
         var chain = CompletableFuture.completedFuture(true);
 
-        if (from.getWorld().equals(to.getWorld())) {
+        // 测试分支: 通过 config.yml 的 spawn-dimension-hop (默认 true) 可关闭维度穿越
+        var dimensionHop = Main.getInstance().getConfig().getBoolean("spawn-dimension-hop", true);
+
+        if (dimensionHop && from.getWorld().equals(to.getWorld())) {
             // 如果生成世界等于目的世界, 则需要穿越一次维度才能获取刷怪能力
             var otherWorld = WorldUtils.getOtherWorld(from.getWorld());
             if (otherWorld == null) {
