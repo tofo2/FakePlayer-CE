@@ -125,12 +125,6 @@ public class Fakeplayer {
         this.handle.disableAdvancements(Main.getInstance());
     }
 
-    private void debug(@NotNull String message) {
-        if (config.isDebug()) {
-            Main.getInstance().getLogger().info("[spawn-tp] " + message);
-        }
-    }
-
     private void applyConfiguredPing() {
         var pings = config.getCustomPing();
         if (pings == null || pings.isEmpty()) {
@@ -265,7 +259,7 @@ public class Fakeplayer {
 
         var dimensionHop = Main.getInstance().getConfig().getBoolean("spawn-dimension-hop", true);
 
-        debug("%s: placed at %s %.1f %.1f %.1f, target %s %.1f %.1f %.1f, dimensionHop=%s".formatted(
+        logger.info("[spawn-tp] %s: placed at %s %.1f %.1f %.1f, target %s %.1f %.1f %.1f, dimensionHop=%s".formatted(
                 name,
                 from.getWorld().getName(), from.getX(), from.getY(), from.getZ(),
                 to.getWorld().getName(), to.getX(), to.getY(), to.getZ(),
@@ -282,7 +276,7 @@ public class Fakeplayer {
                 ).color(GRAY));
             } else {
                 chain = this.player.teleportAsync(otherWorld.getSpawnLocation()).thenApply(success -> {
-                    debug("%s: hop to %s -> %s".formatted(name, otherWorld.getName(), success ? "success" : "FAILED"));
+                    logger.info("[spawn-tp] %s: hop to %s -> %s".formatted(name, otherWorld.getName(), success ? "success" : "FAILED"));
                     return success;
                 });
             }
@@ -300,16 +294,23 @@ public class Fakeplayer {
                          this.player.getWorld().getName()
                  ));
 
-                 return this.player.getScheduler()
-                         .runDelayed(Main.getInstance(), task -> {
-                         }, null, 20L)
-                         .thenCompose(ignored2 -> this.player.teleportAsync(to));
+                 var retry = new CompletableFuture<Boolean>();
+                 Schedulers.globalLater(Main.getInstance(), 20L, () -> {
+                     this.player.teleportAsync(to).whenComplete((retrySuccess, error) -> {
+                         if (error != null) {
+                             retry.completeExceptionally(error);
+                         } else {
+                             retry.complete(retrySuccess);
+                         }
+                     });
+                 });
+                 return retry;
              })
              .thenAccept(success -> {
                  var reallyThere = this.player.getWorld().equals(to.getWorld());
                  var ok = success && reallyThere;
 
-                 debug("%s: final teleport -> %s, actual world %s".formatted(
+                 logger.info("[spawn-tp] %s: final teleport -> %s, actual world %s".formatted(
                          name,
                          ok ? "success" : "FAILED",
                          this.player.getWorld().getName()
@@ -332,16 +333,16 @@ public class Fakeplayer {
         this.player.getScheduler().runDelayed(Main.getInstance(), task -> {
             var now = this.player.getLocation();
             var ok = now.getWorld().equals(to.getWorld());
-            var message = "%s: check after 100 ticks: in %s %.1f %.1f %.1f, expected %s -> %s".formatted(
+            var message = "[spawn-tp] %s: check after 100 ticks: in %s %.1f %.1f %.1f, expected %s -> %s".formatted(
                     name,
                     now.getWorld().getName(), now.getX(), now.getY(), now.getZ(),
                     to.getWorld().getName(),
                     ok ? "OK" : "WRONG WORLD"
             );
             if (ok) {
-                debug(message);
+                logger.info(message);
             } else {
-                logger.warning("[spawn-tp] " + message);
+                logger.warning(message);
             }
         }, null, 100L);
     }
