@@ -90,22 +90,9 @@ public class Fakeplayer {
     @UnknownNullability
     private NMSNetwork network;
 
-    /**
-     * 初始延迟 (ping), 负数表示不模拟
-     */
     private volatile int firstPing = -1;
-
-    /**
-     * 当前延迟, 会在初始值附近小幅波动 (仅用于显示)
-     */
     private volatile int currentPing = -1;
 
-    /**
-     * @param creator      创建者
-     * @param creatorIp    创建者 IP
-     * @param sequenceName 序列名
-     * @param lifespan     存活时间
-     */
     public Fakeplayer(
             @NotNull CommandSender creator,
             @NotNull String creatorIp,
@@ -134,13 +121,10 @@ public class Fakeplayer {
         this.ticker = new FakeplayerTicker(this, lifespan);
         this.player.setPersistent(config.isPersistData());
         this.player.setSleepingIgnored(true);
-        this.handle.setPlayBefore(); // 可避免一些插件的第一次入服欢迎信息
-        this.handle.disableAdvancements(Main.getInstance()); // 不提示成就信息
+        this.handle.setPlayBefore();
+        this.handle.disableAdvancements(Main.getInstance());
     }
 
-    /**
-     * 按配置为假人设置初始延迟 (ping)
-     */
     private void applyConfiguredPing() {
         var pings = config.getCustomPing();
         if (pings == null || pings.isEmpty()) {
@@ -153,20 +137,12 @@ public class Fakeplayer {
         this.setPing(ping);
     }
 
-    /**
-     * 设置假人显示使用的延迟 (ping)
-     *
-     * @param ping 延迟 (毫秒), 负数表示改回使用服务端计算出的真实值
-     */
     public void setPing(int ping) {
         this.firstPing = ping;
         this.currentPing = ping;
         this.pushPing(ping, true);
     }
 
-    /**
-     * 让延迟在设定值附近小幅波动, 避免 Tab 列表里一直显示同一个固定值
-     */
     public void updateDynamicPing() {
         var base = this.firstPing;
         if (base < 0) {
@@ -192,9 +168,6 @@ public class Fakeplayer {
         network.getServerGamePacketListener().setPing(ping, broadcast);
     }
 
-    /**
-     * 让假人诞生
-     */
     public CompletableFuture<Void> spawnAsync(@NotNull SpawnOption option) {
         var address = ipGen.next();
         return Schedulers
@@ -233,10 +206,6 @@ public class Fakeplayer {
                     }
 
                     if (config.isDropInventoryOnQuiting() && !nameManager.isRealPlayerUUID(this.uuid)) {
-                        // 跨服背包同步插件可能导致假人既丢弃了一份到地上，在重新生成的时候又回来了
-                        // 因此在生成的时候清空一次背包
-                        // 但无法解决登陆后延迟同步背包的情况
-                        // 如果该假人使用了真实玩家的 UUID(已玩过), 则保留其原有数据, 不清空背包
                         this.player.getInventory().clear();
                     }
 
@@ -264,10 +233,10 @@ public class Fakeplayer {
                     this.applyConfiguredPing();
                     this.player.setHealth(Optional.ofNullable(this.player.getAttribute(Attributes.maxHealth()))
                                                   .map(AttributeInstance::getValue)
-                                                  .orElse(20D));    // 恢复生命值
+                                                  .orElse(20D));
                     this.player.setFoodLevel(20);
                     this.setupName();
-                    this.handle.setupClientOptions();   // 处理皮肤设置问题
+                    this.handle.setupClientOptions();
 
                     this.teleportToSpawnpoint(option.spawnAt().clone());
                     this.ticker.run();
@@ -283,17 +252,11 @@ public class Fakeplayer {
                 });
     }
 
-    /**
-     * 将假人传送到指定位置
-     *
-     * @param to 目标位置
-     */
     private void teleportToSpawnpoint(@NotNull Location to) {
         var logger = Main.getInstance().getLogger();
         var from = this.player.getLocation();
         var chain = CompletableFuture.completedFuture(true);
 
-        // 测试分支: 通过 config.yml 的 spawn-dimension-hop (默认 true) 可关闭维度穿越
         var dimensionHop = Main.getInstance().getConfig().getBoolean("spawn-dimension-hop", true);
 
         logger.info("[spawn-tp] %s: placed at %s %.1f %.1f %.1f, target %s %.1f %.1f %.1f, dimensionHop=%s".formatted(
@@ -304,7 +267,6 @@ public class Fakeplayer {
         ));
 
         if (dimensionHop && from.getWorld().equals(to.getWorld())) {
-            // 如果生成世界等于目的世界, 则需要穿越一次维度才能获取刷怪能力
             var otherWorld = WorldUtils.getOtherWorld(from.getWorld());
             if (otherWorld == null) {
                 logger.warning("[spawn-tp] %s: no other world found for the dimension hop".formatted(name));
@@ -313,7 +275,6 @@ public class Fakeplayer {
                         text(player.getName(), WHITE)
                 ).color(GRAY));
             } else {
-                // Folia: 区域线程内禁止同步 teleport, 必须使用 teleportAsync
                 chain = this.player.teleportAsync(otherWorld.getSpawnLocation()).thenApply(success -> {
                     logger.info("[spawn-tp] %s: hop to %s -> %s".formatted(name, otherWorld.getName(), success ? "success" : "FAILED"));
                     return success;
@@ -322,13 +283,33 @@ public class Fakeplayer {
         }
 
         chain.thenCompose(ignored -> this.player.teleportAsync(to))
-             .thenAccept(success -> {
-                 logger.info("[spawn-tp] %s: teleport to %s %.1f %.1f %.1f -> %s".formatted(
+             .thenCompose(success -> {
+                 if (success && this.player.getWorld().equals(to.getWorld())) {
+                     return CompletableFuture.completedFuture(true);
+                 }
+
+                 logger.warning("[spawn-tp] %s: teleport reported %s but player is in %s, retrying in 20 ticks".formatted(
                          name,
-                         to.getWorld().getName(), to.getX(), to.getY(), to.getZ(),
-                         success ? "success" : "FAILED"
+                         success,
+                         this.player.getWorld().getName()
                  ));
-                 if (success) {
+
+                 return this.player.getScheduler()
+                         .runDelayed(Main.getInstance(), task -> {
+                         }, null, 20L)
+                         .thenCompose(ignored2 -> this.player.teleportAsync(to));
+             })
+             .thenAccept(success -> {
+                 var reallyThere = this.player.getWorld().equals(to.getWorld());
+                 var ok = success && reallyThere;
+
+                 logger.info("[spawn-tp] %s: final teleport -> %s, actual world %s".formatted(
+                         name,
+                         ok ? "success" : "FAILED",
+                         this.player.getWorld().getName()
+                 ));
+
+                 if (ok) {
                      to.getWorld().playSound(to, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
                  } else {
                      this.creator.sendMessage(translatable(
@@ -342,7 +323,6 @@ public class Fakeplayer {
                  return null;
              });
 
-        // 5 秒后检查假人实际所在世界
         this.player.getScheduler().runDelayed(Main.getInstance(), task -> {
             var now = this.player.getLocation();
             var ok = now.getWorld().equals(to.getWorld());
@@ -388,13 +368,6 @@ public class Fakeplayer {
         return event;
     }
 
-    /**
-     * 判断是否是创建者
-     * <p>如果玩家下线再重新登陆, entityID 将会不一样导致 {@link Object#equals(Object)} 返回 {@code false}</p>
-     *
-     * @param sender 命令执行者
-     * @return 是否是创建者
-     */
     public boolean isCreatedBy(@NotNull CommandSender sender) {
         if (this.creator instanceof Player pc && sender instanceof Player ps) {
             return pc.getUniqueId().equals(ps.getUniqueId());

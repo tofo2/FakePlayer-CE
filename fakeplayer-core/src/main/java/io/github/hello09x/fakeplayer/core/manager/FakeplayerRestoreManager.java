@@ -5,6 +5,7 @@ import com.google.inject.Singleton;
 import io.github.hello09x.fakeplayer.core.Main;
 import io.github.hello09x.fakeplayer.core.util.Schedulers;
 import io.github.hello09x.fakeplayer.core.config.FakeplayerConfig;
+import io.github.hello09x.fakeplayer.core.constant.MetadataKeys;
 import io.github.hello09x.fakeplayer.core.entity.FakeplayerTicker;
 import io.github.hello09x.fakeplayer.core.util.OfflineCreator;
 import org.bukkit.Bukkit;
@@ -27,14 +28,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-/**
- * 记录当前在线的假人, 并在服务器下次启动时自动恢复。
- * <p>开启 {@code restore-on-start} 后:
- * <ul>
- *     <li>周期性把在线假人 (名称 / 创建者 / 位置) 写入快照文件, 关服前再写一次</li>
- *     <li>服务器启动完成的 {@link ServerLoadEvent} 后, 按快照逐个异步重建假人</li>
- * </ul>
- */
 @Singleton
 public class FakeplayerRestoreManager implements Listener {
 
@@ -43,6 +36,7 @@ public class FakeplayerRestoreManager implements Listener {
     private final static String FILE_NAME = "restore-fakeplayers.txt";
     private final static String SEPARATOR = "|";
     private final static long SNAPSHOT_INTERVAL_TICKS = 20L * 30;
+    private final static long MINIMUM_AGE_TICKS = 100L;
 
     private final FakeplayerManager manager;
     private final FakeplayerConfig config;
@@ -53,10 +47,6 @@ public class FakeplayerRestoreManager implements Listener {
         this.config = config;
     }
 
-    /**
-     * 注册周期性快照任务 (插件启用时调用)
-     * <p>任务始终注册, 是否记录由 {@link #saveSnapshot()} 内的配置开关决定, 以便 /fp reload 后动态生效。</p>
-     */
     public void start() {
         Schedulers.asyncTimer(
                 Main.getInstance(),
@@ -66,9 +56,6 @@ public class FakeplayerRestoreManager implements Listener {
         );
     }
 
-    /**
-     * 将当前在线假人 (名称 / 创建者 / 位置) 写入快照文件
-     */
     public void saveSnapshot() {
         if (!config.isRestoreOnStart()) {
             return;
@@ -79,6 +66,17 @@ public class FakeplayerRestoreManager implements Listener {
             if (creator == null) {
                 continue;
             }
+
+            var spawnedAt = player.getMetadata(MetadataKeys.SPAWNED_AT).stream()
+                    .findFirst()
+                    .map(value -> value.asLong())
+                    .orElse(0L);
+
+            if (Bukkit.getCurrentTick() - spawnedAt < MINIMUM_AGE_TICKS) {
+                log.info("Skipping snapshot for freshly spawned fake player %s".formatted(player.getName()));
+                continue;
+            }
+
             var location = player.getLocation();
             lines.add(String.join(SEPARATOR,
                     player.getName(),
@@ -94,9 +92,6 @@ public class FakeplayerRestoreManager implements Listener {
         this.write(lines);
     }
 
-    /**
-     * 服务器启动完成后, 按快照自动恢复假人
-     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onServerLoad(@NotNull ServerLoadEvent event) {
         if (event.getType() != ServerLoadEvent.LoadType.STARTUP) {
@@ -113,7 +108,6 @@ public class FakeplayerRestoreManager implements Listener {
         log.info("Restoring %d fake player(s) from the last session...".formatted(entries.size()));
         var lifespan = Optional.ofNullable(config.getLifespan()).map(Duration::toMillis).orElse(FakeplayerTicker.NON_REMOVE_AT);
 
-        // 逐个重建需要等待, 放到异步线程串行执行 (与 /spawn 的异步生成流程一致)
         Schedulers.async(Main.getInstance(), () -> {
             var restored = 0;
             for (var entry : entries) {
