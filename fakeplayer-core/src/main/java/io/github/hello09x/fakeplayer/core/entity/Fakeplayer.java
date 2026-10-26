@@ -125,6 +125,12 @@ public class Fakeplayer {
         this.handle.disableAdvancements(Main.getInstance());
     }
 
+    private void debug(@NotNull String message) {
+        if (config.isDebug()) {
+            Main.getInstance().getLogger().info("[spawn-tp] " + message);
+        }
+    }
+
     private void applyConfiguredPing() {
         var pings = config.getCustomPing();
         if (pings == null || pings.isEmpty()) {
@@ -259,7 +265,7 @@ public class Fakeplayer {
 
         var dimensionHop = Main.getInstance().getConfig().getBoolean("spawn-dimension-hop", true);
 
-        logger.info("[spawn-tp] %s: placed at %s %.1f %.1f %.1f, target %s %.1f %.1f %.1f, dimensionHop=%s".formatted(
+        debug("%s: placed at %s %.1f %.1f %.1f, target %s %.1f %.1f %.1f, dimensionHop=%s".formatted(
                 name,
                 from.getWorld().getName(), from.getX(), from.getY(), from.getZ(),
                 to.getWorld().getName(), to.getX(), to.getY(), to.getZ(),
@@ -276,7 +282,7 @@ public class Fakeplayer {
                 ).color(GRAY));
             } else {
                 chain = this.player.teleportAsync(otherWorld.getSpawnLocation()).thenApply(success -> {
-                    logger.info("[spawn-tp] %s: hop to %s -> %s".formatted(name, otherWorld.getName(), success ? "success" : "FAILED"));
+                    debug("%s: hop to %s -> %s".formatted(name, otherWorld.getName(), success ? "success" : "FAILED"));
                     return success;
                 });
             }
@@ -303,7 +309,7 @@ public class Fakeplayer {
                  var reallyThere = this.player.getWorld().equals(to.getWorld());
                  var ok = success && reallyThere;
 
-                 logger.info("[spawn-tp] %s: final teleport -> %s, actual world %s".formatted(
+                 debug("%s: final teleport -> %s, actual world %s".formatted(
                          name,
                          ok ? "success" : "FAILED",
                          this.player.getWorld().getName()
@@ -326,16 +332,16 @@ public class Fakeplayer {
         this.player.getScheduler().runDelayed(Main.getInstance(), task -> {
             var now = this.player.getLocation();
             var ok = now.getWorld().equals(to.getWorld());
-            var message = "[spawn-tp] %s: check after 100 ticks: in %s %.1f %.1f %.1f, expected %s -> %s".formatted(
+            var message = "%s: check after 100 ticks: in %s %.1f %.1f %.1f, expected %s -> %s".formatted(
                     name,
                     now.getWorld().getName(), now.getX(), now.getY(), now.getZ(),
                     to.getWorld().getName(),
                     ok ? "OK" : "WRONG WORLD"
             );
             if (ok) {
-                logger.info(message);
+                debug(message);
             } else {
-                logger.warning(message);
+                logger.warning("[spawn-tp] " + message);
             }
         }, null, 100L);
     }
