@@ -244,8 +244,10 @@ public class Fakeplayer {
                     this.setupName();
                     this.handle.setupClientOptions();
 
-                    this.teleportToSpawnpoint(option.spawnAt().clone());
-                    this.ticker.run();
+                    // Der Ticker darf erst starten, wenn der Teleport abgeschlossen ist.
+                    // Sonst liest doFirstTick() noch die alte Position und teleportiert den Bot dorthin zurück.
+                    this.teleportToSpawnpoint(option.spawnAt().clone())
+                        .whenComplete((ignored, error) -> this.ticker.run());
                 }))
                 .whenComplete((ignored, throwable) -> {
                     if (throwable != null) {
@@ -258,7 +260,7 @@ public class Fakeplayer {
                 });
     }
 
-    private void teleportToSpawnpoint(@NotNull Location to) {
+    private @NotNull CompletableFuture<Boolean> teleportToSpawnpoint(@NotNull Location to) {
         var logger = Main.getInstance().getLogger();
         var from = this.player.getLocation();
         var chain = CompletableFuture.completedFuture(true);
@@ -288,7 +290,7 @@ public class Fakeplayer {
             }
         }
 
-        chain.thenCompose(ignored -> this.player.teleportAsync(to))
+        var result = chain.thenCompose(ignored -> this.player.teleportAsync(to))
              .thenCompose(success -> {
                  if (success && this.player.getWorld().equals(to.getWorld())) {
                      return CompletableFuture.completedFuture(true);
@@ -312,7 +314,7 @@ public class Fakeplayer {
                  });
                  return retry;
              })
-             .thenAccept(success -> {
+             .thenApply(success -> {
                  var reallyThere = this.player.getWorld().equals(to.getWorld());
                  var ok = success && reallyThere;
 
@@ -330,20 +332,24 @@ public class Fakeplayer {
                              text(player.getName(), WHITE)
                      ).color(GRAY));
                  }
+                 return ok;
              })
              .exceptionally(throwable -> {
                  logger.warning("[spawn-tp] %s: teleport threw %s".formatted(name, throwable));
-                 return null;
+                 return false;
              });
 
         this.player.getScheduler().runDelayed(Main.getInstance(), task -> {
             var now = this.player.getLocation();
-            var ok = now.getWorld().equals(to.getWorld());
-            var message = "%s: check after 100 ticks: in %s %.1f %.1f %.1f, expected %s -> %s".formatted(
+            var sameWorld = now.getWorld().equals(to.getWorld());
+            var distance = sameWorld ? now.distance(to) : -1.0D;
+            var ok = sameWorld && distance < 5.0D;
+            var status = ok ? "OK" : (sameWorld ? "WRONG POSITION" : "WRONG WORLD");
+            var message = "%s: check after 100 ticks: in %s %.1f %.1f %.1f, expected %s %.1f %.1f %.1f -> %s".formatted(
                     name,
                     now.getWorld().getName(), now.getX(), now.getY(), now.getZ(),
-                    to.getWorld().getName(),
-                    ok ? "OK" : "WRONG WORLD"
+                    to.getWorld().getName(), to.getX(), to.getY(), to.getZ(),
+                    status
             );
             if (ok) {
                 debug(message);
@@ -351,6 +357,8 @@ public class Fakeplayer {
                 logger.warning("[spawn-tp] " + message);
             }
         }, null, 100L);
+
+        return result;
     }
 
     public boolean isOnline() {
