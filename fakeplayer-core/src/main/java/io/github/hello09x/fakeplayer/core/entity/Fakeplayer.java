@@ -289,28 +289,45 @@ public class Fakeplayer {
      * @param to 目标位置
      */
     private void teleportToSpawnpoint(@NotNull Location to) {
+        var logger = Main.getInstance().getLogger();
         var from = this.player.getLocation();
         var chain = CompletableFuture.completedFuture(true);
 
         // 测试分支: 通过 config.yml 的 spawn-dimension-hop (默认 true) 可关闭维度穿越
         var dimensionHop = Main.getInstance().getConfig().getBoolean("spawn-dimension-hop", true);
 
+        logger.info("[spawn-tp] %s: placed at %s %.1f %.1f %.1f, target %s %.1f %.1f %.1f, dimensionHop=%s".formatted(
+                name,
+                from.getWorld().getName(), from.getX(), from.getY(), from.getZ(),
+                to.getWorld().getName(), to.getX(), to.getY(), to.getZ(),
+                dimensionHop
+        ));
+
         if (dimensionHop && from.getWorld().equals(to.getWorld())) {
             // 如果生成世界等于目的世界, 则需要穿越一次维度才能获取刷怪能力
             var otherWorld = WorldUtils.getOtherWorld(from.getWorld());
             if (otherWorld == null) {
+                logger.warning("[spawn-tp] %s: no other world found for the dimension hop".formatted(name));
                 this.creator.sendMessage(translatable(
                         "fakeplayer.command.spawn.error.no-mob-spawning-ability",
                         text(player.getName(), WHITE)
                 ).color(GRAY));
             } else {
                 // Folia: 区域线程内禁止同步 teleport, 必须使用 teleportAsync
-                chain = this.player.teleportAsync(otherWorld.getSpawnLocation());
+                chain = this.player.teleportAsync(otherWorld.getSpawnLocation()).thenApply(success -> {
+                    logger.info("[spawn-tp] %s: hop to %s -> %s".formatted(name, otherWorld.getName(), success ? "success" : "FAILED"));
+                    return success;
+                });
             }
         }
 
         chain.thenCompose(ignored -> this.player.teleportAsync(to))
              .thenAccept(success -> {
+                 logger.info("[spawn-tp] %s: teleport to %s %.1f %.1f %.1f -> %s".formatted(
+                         name,
+                         to.getWorld().getName(), to.getX(), to.getY(), to.getZ(),
+                         success ? "success" : "FAILED"
+                 ));
                  if (success) {
                      to.getWorld().playSound(to, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
                  } else {
@@ -319,7 +336,28 @@ public class Fakeplayer {
                              text(player.getName(), WHITE)
                      ).color(GRAY));
                  }
+             })
+             .exceptionally(throwable -> {
+                 logger.warning("[spawn-tp] %s: teleport threw %s".formatted(name, throwable));
+                 return null;
              });
+
+        // 5 秒后检查假人实际所在世界
+        this.player.getScheduler().runDelayed(Main.getInstance(), task -> {
+            var now = this.player.getLocation();
+            var ok = now.getWorld().equals(to.getWorld());
+            var message = "[spawn-tp] %s: check after 100 ticks: in %s %.1f %.1f %.1f, expected %s -> %s".formatted(
+                    name,
+                    now.getWorld().getName(), now.getX(), now.getY(), now.getZ(),
+                    to.getWorld().getName(),
+                    ok ? "OK" : "WRONG WORLD"
+            );
+            if (ok) {
+                logger.info(message);
+            } else {
+                logger.warning(message);
+            }
+        }, null, 100L);
     }
 
     public boolean isOnline() {
