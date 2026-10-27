@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -40,6 +41,9 @@ public class FakeplayerRestoreManager implements Listener {
 
     private final FakeplayerManager manager;
     private final FakeplayerConfig config;
+
+    @Inject
+    private FakeplayerList playerList;
 
     @Inject
     public FakeplayerRestoreManager(FakeplayerManager manager, FakeplayerConfig config) {
@@ -77,6 +81,14 @@ public class FakeplayerRestoreManager implements Listener {
                 continue;
             }
 
+            UUID creatorUuid = null;
+            if (this.playerList != null) {
+                var fakeplayer = this.playerList.getByUUID(player.getUniqueId());
+                if (fakeplayer != null) {
+                    creatorUuid = FakeplayerList.creatorUuid(fakeplayer.getCreator());
+                }
+            }
+
             var location = player.getLocation();
             lines.add(String.join(SEPARATOR,
                     player.getName(),
@@ -86,7 +98,8 @@ public class FakeplayerRestoreManager implements Listener {
                     String.valueOf(location.getY()),
                     String.valueOf(location.getZ()),
                     String.valueOf(location.getYaw()),
-                    String.valueOf(location.getPitch())
+                    String.valueOf(location.getPitch()),
+                    creatorUuid == null ? "" : creatorUuid.toString()
             ));
         }
         this.write(lines);
@@ -113,11 +126,20 @@ public class FakeplayerRestoreManager implements Listener {
             for (var entry : entries) {
                 try {
                     var location = this.resolveLocation(entry);
-                    var player = manager.spawnAsync(new OfflineCreator(entry.creator()), entry.name(), location, lifespan)
+
+                    var creatorName = entry.creator();
+                    if (entry.creatorUuid() != null) {
+                        var currentName = Bukkit.getOfflinePlayer(entry.creatorUuid()).getName();
+                        if (currentName != null && !currentName.isBlank()) {
+                            creatorName = currentName;
+                        }
+                    }
+
+                    var player = manager.spawnAsync(new OfflineCreator(creatorName, entry.creatorUuid()), entry.name(), location, lifespan)
                                          .get(30, TimeUnit.SECONDS);
                     if (player != null) {
                         restored++;
-                        log.info("Restored fake player %s (creator: %s)".formatted(entry.name(), entry.creator()));
+                        log.info("Restored fake player %s (creator: %s)".formatted(entry.name(), creatorName));
                     }
                 } catch (Exception e) {
                     log.warning("Failed to restore fake player %s: %s".formatted(entry.name(), e.getMessage()));
@@ -181,6 +203,16 @@ public class FakeplayerRestoreManager implements Listener {
         if (parts.length < 8 || parts[0].isBlank() || parts[1].isBlank()) {
             return null;
         }
+
+        UUID creatorUuid = null;
+        if (parts.length > 8 && !parts[8].isBlank()) {
+            try {
+                creatorUuid = UUID.fromString(parts[8].trim());
+            } catch (IllegalArgumentException ignored) {
+                log.warning("restore-fakeplayers.txt contains an illegal creator UUID: " + parts[8]);
+            }
+        }
+
         try {
             return new Entry(
                     parts[0],
@@ -190,7 +222,8 @@ public class FakeplayerRestoreManager implements Listener {
                     Double.parseDouble(parts[4]),
                     Double.parseDouble(parts[5]),
                     Float.parseFloat(parts[6]),
-                    Float.parseFloat(parts[7])
+                    Float.parseFloat(parts[7]),
+                    creatorUuid
             );
         } catch (NumberFormatException e) {
             return null;
@@ -205,7 +238,8 @@ public class FakeplayerRestoreManager implements Listener {
             double y,
             double z,
             float yaw,
-            float pitch
+            float pitch,
+            @Nullable UUID creatorUuid
     ) {
     }
 

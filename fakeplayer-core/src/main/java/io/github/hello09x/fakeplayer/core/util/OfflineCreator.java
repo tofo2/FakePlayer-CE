@@ -10,6 +10,7 @@ import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Set;
@@ -18,14 +19,38 @@ import java.util.UUID;
 /**
  * 离线创建者代理。
  * <p>服务器启动自动恢复假人时原创建者通常不在线, 以该代理作为创建者身份:
- * 假人仍归属于原创建者 (按名称匹配), 同时 {@link #isOp()} 返回 true 以跳过假人数量限制检查。</p>
+ * 假人仍归属于原创建者 (优先按 UUID 匹配, 没有 UUID 时按名称匹配), 同时 {@link #isOp()} 返回 true 以跳过假人数量限制检查。</p>
  */
 public class OfflineCreator implements CommandSender {
 
     private final String name;
 
+    private volatile @Nullable UUID uuid;
+
     public OfflineCreator(@NotNull String name) {
+        this(name, null);
+    }
+
+    public OfflineCreator(@NotNull String name, @Nullable UUID uuid) {
         this.name = name;
+        this.uuid = uuid;
+    }
+
+    /**
+     * @return 原创建者的 UUID, 未知时为 {@code null}
+     */
+    public @Nullable UUID getUniqueId() {
+        return this.uuid;
+    }
+
+    /**
+     * 当一个名称匹配的真实玩家出现时记录其 UUID, 之后改名也不会丢失归属。
+     * 只在 UUID 尚未设置时生效。
+     */
+    public void adoptUniqueId(@NotNull UUID uuid) {
+        if (this.uuid == null) {
+            this.uuid = uuid;
+        }
     }
 
     @Override

@@ -10,6 +10,7 @@ import io.github.hello09x.fakeplayer.core.config.FakeplayerConfig;
 import io.github.hello09x.fakeplayer.core.config.PreventKicking;
 import io.github.hello09x.fakeplayer.core.constant.MetadataKeys;
 import io.github.hello09x.fakeplayer.core.manager.FakeplayerAutofishManager;
+import io.github.hello09x.fakeplayer.core.manager.FakeplayerList;
 import io.github.hello09x.fakeplayer.core.manager.FakeplayerReplenishManager;
 import io.github.hello09x.fakeplayer.core.manager.FakeplayerSkinManager;
 import io.github.hello09x.fakeplayer.core.manager.action.ActionManager;
@@ -389,12 +390,21 @@ public class Fakeplayer {
     }
 
     public boolean isCreatedBy(@NotNull CommandSender sender) {
-        if (this.creator instanceof Player pc && sender instanceof Player ps) {
-            return pc.getUniqueId().equals(ps.getUniqueId());
+        var creatorUuid = FakeplayerList.creatorUuid(this.creator);
+        var senderUuid = FakeplayerList.creatorUuid(sender);
+
+        if (creatorUuid != null && senderUuid != null) {
+            return creatorUuid.equals(senderUuid);
         }
 
-        if (this.creator instanceof OfflineCreator) {
-            return this.creator.getName().equals(sender.getName());
+        // Alte Restore-Datei ohne UUID: Namen vergleichen und die UUID des Spielers merken,
+        // damit der Bot auch nach einer Namensänderung weiter ihm gehört.
+        if (this.creator instanceof OfflineCreator offline && senderUuid != null) {
+            if (!offline.getName().equals(sender.getName())) {
+                return false;
+            }
+            offline.adoptUniqueId(senderUuid);
+            return true;
         }
 
         return creator.getClass() == sender.getClass()
