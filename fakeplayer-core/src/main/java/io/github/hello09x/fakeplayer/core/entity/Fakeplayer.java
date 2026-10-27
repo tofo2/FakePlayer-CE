@@ -17,6 +17,7 @@ import io.github.hello09x.fakeplayer.core.manager.naming.NameManager;
 import io.github.hello09x.fakeplayer.core.manager.naming.SequenceName;
 import io.github.hello09x.fakeplayer.core.util.Attributes;
 import io.github.hello09x.fakeplayer.core.util.InternalAddressGenerator;
+import io.github.hello09x.fakeplayer.core.util.OfflineCreator;
 import lombok.Getter;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -244,8 +245,6 @@ public class Fakeplayer {
                     this.setupName();
                     this.handle.setupClientOptions();
 
-                    // Der Ticker darf erst starten, wenn der Teleport abgeschlossen ist.
-                    // Sonst liest doFirstTick() noch die alte Position und teleportiert den Bot dorthin zurück.
                     this.teleportToSpawnpoint(option.spawnAt().clone())
                         .whenComplete((ignored, error) -> this.ticker.run());
                 }))
@@ -393,7 +392,13 @@ public class Fakeplayer {
         if (this.creator instanceof Player pc && sender instanceof Player ps) {
             return pc.getUniqueId().equals(ps.getUniqueId());
         }
-        return creator.getClass() == sender.getClass() && creator.getName().equals(sender.getName());
+
+        if (this.creator instanceof OfflineCreator) {
+            return this.creator.getName().equals(sender.getName());
+        }
+
+        return creator.getClass() == sender.getClass()
+                && creator.getName().equals(sender.getName());
     }
 
     public @NotNull UUID getUUID() {
