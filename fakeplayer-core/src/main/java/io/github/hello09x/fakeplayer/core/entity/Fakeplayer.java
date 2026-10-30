@@ -246,8 +246,12 @@ public class Fakeplayer {
                     this.setupName();
                     this.handle.setupClientOptions();
 
-                    this.teleportToSpawnpoint(option.spawnAt().clone())
-                        .whenComplete((ignored, error) -> this.ticker.run());
+                    var teleport = this.teleportToSpawnpoint(option.spawnAt().clone());
+                    if (option.simulationDistance() >= 0) {
+                        // 玩家进入世界后再设置, 否则区块追踪还没有建立
+                        this.player.setSimulationDistance(option.simulationDistance());
+                    }
+                    teleport.whenComplete((ignored, error) -> this.ticker.run());
                 }))
                 .whenComplete((ignored, throwable) -> {
                     if (throwable != null) {
