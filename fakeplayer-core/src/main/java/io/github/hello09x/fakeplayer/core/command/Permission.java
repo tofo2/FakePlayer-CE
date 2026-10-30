@@ -6,6 +6,7 @@ public interface Permission {
     String spawnName = "fakeplayer.command.spawn.name";
     String spawnNameForceReal = "fakeplayer.command.spawn.name.force-real";
     String spawnLocation = "fakeplayer.command.spawn.location";
+    String spawnUUID = "fakeplayer.command.spawn.uuid";
 
     String select = "fakeplayer.command.select";
     String selection = "fakeplayer.command.selection";
@@ -50,6 +51,7 @@ public interface Permission {
     String wakeup = "fakeplayer.command.wakeup";
     String cmd = "fakeplayer.command.cmd";
     String say = "fakeplayer.command.say";
+    String aichat = "fakeplayer.command.aichat";
     String stop = "fakeplayer.command.stop";
     String password = "fakeplayer.command.password";
     String changepassword = "fakeplayer.command.changepassword";

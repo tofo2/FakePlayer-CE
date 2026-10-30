@@ -139,6 +139,11 @@ public class FakeplayerConfig extends PluginConfig {
     private boolean kickOnDead;
 
     /**
+     * 假人死亡时是否广播死亡消息
+     */
+    private boolean deathMessage;
+
+    /**
      * 是否在服务器启动后自动恢复上次在线的假人
      */
     private boolean restoreOnStart;
@@ -302,6 +307,11 @@ public class FakeplayerConfig extends PluginConfig {
     private boolean httpAdminSay;
 
     /**
+     * 是否启用 HTTP 接口 /aichat
+     */
+    private boolean httpAdminAichat;
+
+    /**
      * 是否启用 status 接口
      */
     private boolean httpAdminStatus;
@@ -434,6 +444,7 @@ public class FakeplayerConfig extends PluginConfig {
         this.dropInventoryOnQuiting = file.getBoolean("drop-inventory-on-quiting", true);
         this.persistData = file.getBoolean("persist-data", true);
         this.kickOnDead = file.getBoolean("kick-on-dead", true);
+        this.deathMessage = file.getBoolean("death-message", false);
         this.restoreOnStart = file.getBoolean("restore-on-start", false);
         this.shareFakeplayer = file.getBoolean("share-fakeplayer", false);
         this.checkForUpdates = file.getBoolean("check-for-updates", true);
@@ -476,6 +487,7 @@ public class FakeplayerConfig extends PluginConfig {
         this.httpAdminKick = file.getBoolean("http-admin.interface.kick", true);
         this.httpAdminKill = file.getBoolean("http-admin.interface.kill", true);
         this.httpAdminSay = file.getBoolean("http-admin.interface.say", true);
+        this.httpAdminAichat = file.getBoolean("http-admin.interface.aichat", true);
         this.httpAdminStatus = file.getBoolean("http-admin.interface.status", true);
         this.httpAdminInfo = file.getBoolean("http-admin.interface.info", true);
         this.httpAdminAction = file.getBoolean("http-admin.interface.action", true);

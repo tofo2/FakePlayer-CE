@@ -94,6 +94,8 @@ public class CommandRegistry {
 
     @Inject
     private SayCommand sayCommand;
+    @Inject
+    private AiChatCommand aiChatCommand;
 
     @Inject
     private PasswordCommand passwordCommand;
@@ -135,6 +137,16 @@ public class CommandRegistry {
                                         world("world").withPermission(Permission.spawnLocation),
                                         location("location").withPermission(Permission.spawnLocation))
                                 .executes(spawnCommand::spawn),
+                        command("spawnuuid")
+                                .withPermission(Permission.spawnUUID)
+                                .withShortDescription("fakeplayer.command.spawnuuid.description")
+                                .withArguments(
+                                        text("name").withPermission(Permission.spawnName),
+                                        text("uuid"))
+                                .withOptionalArguments(
+                                        world("world").withPermission(Permission.spawnLocation),
+                                        location("location").withPermission(Permission.spawnLocation))
+                                .executes(spawnCommand::spawnWithUuid),
                         command("kick")
                                 .withPermission(Permission.kick)
                                 .withShortDescription("fakeplayer.command.kick.description")
@@ -543,6 +555,48 @@ public class CommandRegistry {
                                                 .executes((sender, args) -> {
                                                     sender.sendMessage(translatable("fakeplayer.command.say.help"));
                                                 })
+                                ),
+
+                        command("aichat")
+                                .withShortDescription("fakeplayer.command.aichat.description")
+                                .withRequirement(CommandSupports::hasFakeplayer)
+                                .withPermission(Permission.aichat)
+                                .executes((sender, args) -> {
+                                    sender.sendMessage(translatable("fakeplayer.command.aichat.help"));
+                                })
+                                .withSubcommands(
+                                        command("public")
+                                                .withShortDescription("fakeplayer.command.aichat.public")
+                                                .executes(aiChatCommand::publicOnce)
+                                                .withSubcommands(
+                                                        command("once")
+                                                                .withOptionalArguments(fakeplayer("name"))
+                                                                .executes(aiChatCommand::publicOnce),
+                                                        command("continuous")
+                                                                .withOptionalArguments(fakeplayer("name"))
+                                                                .executes(aiChatCommand::publicContinuous),
+                                                        command("interval")
+                                                                .withOptionalArguments(int32("ticks", 20), fakeplayer("name"))
+                                                                .executes(aiChatCommand::publicContinuous)
+                                                ),
+                                        command("private")
+                                                .withShortDescription("fakeplayer.command.aichat.private")
+                                                .withArguments(new EntitySelectorArgument.OnePlayer("target"))
+                                                .executes(aiChatCommand::privateOnce)
+                                                .withSubcommands(
+                                                        command("once")
+                                                                .withOptionalArguments(fakeplayer("name"))
+                                                                .executes(aiChatCommand::privateOnce),
+                                                        command("continuous")
+                                                                .withOptionalArguments(fakeplayer("name"))
+                                                                .executes(aiChatCommand::privateContinuous),
+                                                        command("interval")
+                                                                .withOptionalArguments(int32("ticks", 20), fakeplayer("name"))
+                                                                .executes(aiChatCommand::privateContinuous)
+                                                ),
+                                        command("stop")
+                                                .withOptionalArguments(fakeplayer("name"))
+                                                .executes(aiChatCommand::stop)
                                 ),
 
                         command("kickall")

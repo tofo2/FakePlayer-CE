@@ -2,7 +2,10 @@ package io.github.hello09x.fakeplayer.core.manager;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import io.github.hello09x.fakeplayer.api.spi.ActionSetting;
+import io.github.hello09x.fakeplayer.api.spi.ActionType;
 import io.github.hello09x.fakeplayer.core.Main;
+import io.github.hello09x.fakeplayer.core.manager.action.ActionManager;
 import io.github.hello09x.fakeplayer.core.util.Schedulers;
 import io.github.hello09x.fakeplayer.core.config.FakeplayerConfig;
 import io.github.hello09x.fakeplayer.core.constant.MetadataKeys;
@@ -13,6 +16,7 @@ import org.bukkit.Location;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.entity.Player;
 import org.bukkit.event.server.ServerLoadEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -23,7 +27,9 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -41,16 +47,24 @@ public class FakeplayerRestoreManager implements Listener {
 
     private final FakeplayerManager manager;
     private final FakeplayerConfig config;
+    private final ActionManager actionManager;
+    private final FakeplayerList playerList;
+
+    private volatile String lastSnapshot;
 
     @Inject
-    private FakeplayerList playerList;
-
-    @Inject
-    public FakeplayerRestoreManager(FakeplayerManager manager, FakeplayerConfig config) {
+    public FakeplayerRestoreManager(
+            FakeplayerManager manager,
+            FakeplayerConfig config,
+            ActionManager actionManager,
+            FakeplayerList playerList
+    ) {
         this.manager = manager;
         this.config = config;
+        this.actionManager = actionManager;
+        this.playerList = playerList;
     }
-
+  
     public void start() {
         Schedulers.asyncTimer(
                 Main.getInstance(),
@@ -99,9 +113,17 @@ public class FakeplayerRestoreManager implements Listener {
                     String.valueOf(location.getZ()),
                     String.valueOf(location.getYaw()),
                     String.valueOf(location.getPitch()),
+                    this.encodeActions(actionManager.getSettings(player)),
                     creatorUuid == null ? "" : creatorUuid.toString()
             ));
         }
+
+        // 内容没变就不落盘, 避免每 30 秒无谓写文件
+        var content = String.join("\n", lines);
+        if (content.equals(this.lastSnapshot)) {
+            return;
+        }
+        this.lastSnapshot = content;
         this.write(lines);
     }
 
@@ -139,6 +161,7 @@ public class FakeplayerRestoreManager implements Listener {
                                          .get(30, TimeUnit.SECONDS);
                     if (player != null) {
                         restored++;
+                        this.restoreActions(player, entry.actions());
                         log.info("Restored fake player %s (creator: %s)".formatted(entry.name(), creatorName));
                     }
                 } catch (Exception e) {
@@ -204,13 +227,20 @@ public class FakeplayerRestoreManager implements Listener {
             return null;
         }
 
+        List<ActionEntry> actions = List.of();
         UUID creatorUuid = null;
-        if (parts.length > 8 && !parts[8].isBlank()) {
-            try {
-                creatorUuid = UUID.fromString(parts[8].trim());
-            } catch (IllegalArgumentException ignored) {
-                log.warning("restore-fakeplayers.txt contains an illegal creator UUID: " + parts[8]);
+
+        if (parts.length > 8) {
+            var field = parts[8].trim();
+            // Alte Test-Dateien: Index 8 enthielt direkt die Ersteller-UUID
+            if (field.length() == 36 && field.indexOf(',') < 0 && parseUuid(field) != null) {
+                creatorUuid = parseUuid(field);
+            } else {
+                actions = this.decodeActions(field);
             }
+        }
+        if (parts.length > 9 && !parts[9].isBlank()) {
+            creatorUuid = parseUuid(parts[9].trim());
         }
 
         try {
@@ -223,11 +253,104 @@ public class FakeplayerRestoreManager implements Listener {
                     Double.parseDouble(parts[5]),
                     Float.parseFloat(parts[6]),
                     Float.parseFloat(parts[7]),
+                    actions,
                     creatorUuid
             );
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private @Nullable UUID parseUuid(@NotNull String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            log.warning("restore-fakeplayers.txt contains an illegal creator UUID: " + value);
+            return null;
+        }
+    }
+
+    /**
+     * 恢复假人上次的动作; 必须在假人所属的实体线程执行
+     */
+    private void restoreActions(@NotNull Player player, @NotNull List<ActionEntry> actions) {
+        if (actions.isEmpty()) {
+            return;
+        }
+        Schedulers.entity(Main.getInstance(), player, () -> {
+            if (!player.isValid()) {
+                return;
+            }
+            for (var action : actions) {
+                try {
+                    actionManager.setAction(player, action.type(), action.setting());
+                } catch (RuntimeException e) {
+                    log.warning("Failed to restore action %s of %s: %s".formatted(action.type(), player.getName(), e.getMessage()));
+                }
+            }
+        });
+    }
+
+    /**
+     * 编码为 {@code TYPE,maximum,remains,interval,wait,message,tx,ty,tz}, 多个动作以 {@code ;} 分隔。
+     * <p>只有 message 是自由文本, 用 Base64 避免与分隔符冲突。</p>
+     */
+    private @NotNull String encodeActions(@NotNull Map<ActionType, ActionSetting> settings) {
+        if (settings.isEmpty()) {
+            return "";
+        }
+        var encoded = new StringBuilder();
+        for (var entry : settings.entrySet()) {
+            var setting = entry.getValue();
+            if (!encoded.isEmpty()) {
+                encoded.append(';');
+            }
+            encoded.append(entry.getKey().name()).append(',')
+                   .append(setting.maximum).append(',')
+                   .append(setting.remains).append(',')
+                   .append(setting.interval).append(',')
+                   .append(setting.wait).append(',')
+                   .append(setting.message == null ? "" : Base64.getUrlEncoder().withoutPadding().encodeToString(setting.message.getBytes(StandardCharsets.UTF_8))).append(',')
+                   .append(setting.targetX == null ? "" : setting.targetX).append(',')
+                   .append(setting.targetY == null ? "" : setting.targetY).append(',')
+                   .append(setting.targetZ == null ? "" : setting.targetZ);
+        }
+        return encoded.toString();
+    }
+
+    private @NotNull List<ActionEntry> decodeActions(@NotNull String encoded) {
+        if (encoded.isBlank()) {
+            return List.of();
+        }
+        var actions = new ArrayList<ActionEntry>();
+        for (var part : encoded.split(";")) {
+            var fields = part.split(",", -1);
+            if (fields.length < 9) {
+                continue;
+            }
+            try {
+                var setting = new ActionSetting(
+                        Integer.parseInt(fields[1]),
+                        Integer.parseInt(fields[3]),
+                        Integer.parseInt(fields[4]),
+                        fields[5].isEmpty() ? null : new String(Base64.getUrlDecoder().decode(fields[5]), StandardCharsets.UTF_8)
+                );
+                setting.remains = Integer.parseInt(fields[2]);
+                setting.targetX = fields[6].isEmpty() ? null : Double.parseDouble(fields[6]);
+                setting.targetY = fields[7].isEmpty() ? null : Double.parseDouble(fields[7]);
+                setting.targetZ = fields[8].isEmpty() ? null : Double.parseDouble(fields[8]);
+                actions.add(new ActionEntry(ActionType.valueOf(fields[0]), setting));
+            } catch (RuntimeException e) {
+                log.warning("Failed to decode restored action: " + part);
+            }
+        }
+        return actions;
+    }
+
+    private record ActionEntry(
+            @NotNull ActionType type,
+            @NotNull ActionSetting setting
+    ) {
     }
 
     private record Entry(
@@ -239,6 +362,7 @@ public class FakeplayerRestoreManager implements Listener {
             double z,
             float yaw,
             float pitch,
+            @NotNull List<ActionEntry> actions,
             @Nullable UUID creatorUuid
     ) {
     }
