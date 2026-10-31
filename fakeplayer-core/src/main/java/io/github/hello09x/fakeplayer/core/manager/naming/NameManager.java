@@ -142,6 +142,13 @@ public class NameManager {
     public @NotNull SequenceName getSpecifiedName(@NotNull CommandSender sender, @NotNull String name) {
         name = this.normalizeName(name);
 
+        // Groß-/Kleinschreibung ignorieren: Gibt es schon einen Fakeplayer mit diesem Namen, wird dessen
+        // gespeicherte Schreibweise (und damit dessen UUID) verwendet
+        var existing = profileRepository.selectByName(name);
+        if (existing != null) {
+            name = existing.name();
+        }
+
         var player = Bukkit.getOfflinePlayer(name);
         var uuid = player.getUniqueId();
         if (this.isRealPlayerUUID(uuid)) {

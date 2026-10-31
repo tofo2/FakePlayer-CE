@@ -5,6 +5,7 @@ import com.google.inject.Singleton;
 import dev.jorel.commandapi.CommandPermission;
 import dev.jorel.commandapi.arguments.EntitySelectorArgument;
 import dev.jorel.commandapi.arguments.GreedyStringArgument;
+import dev.jorel.commandapi.arguments.LiteralArgument;
 import io.github.hello09x.devtools.core.translation.TranslatorUtils;
 import io.github.hello09x.fakeplayer.api.spi.ActionSetting;
 import io.github.hello09x.fakeplayer.api.spi.ActionType;
@@ -106,6 +107,11 @@ public class CommandRegistry {
     @Inject
     private FakeplayerConfig config;
 
+    /**
+     * CommandAPI-Regel: Ein Befehl mit Unterbefehlen darf auf Elternebene keine optionalen Argumente haben,
+     * sonst folgt das Pflicht-Literal des Unterbefehls auf ein optionales Argument und die Registrierung
+     * scheitert mit einer OptionalArgumentException. Optionale Argumente gehören deshalb in die Unterbefehle.
+     */
     public void register() {
         var helpLocale = TranslatorUtils.getDefaultLocale(Main.getInstance());
         var helpLocalizer = new CommandHelpLocalizer(Main.getInstance(), helpLocale);
@@ -255,18 +261,22 @@ public class CommandRegistry {
                                 .withOptionalArguments(fakeplayer("name"))
                                 .executesPlayer(expmeCommand::expme),
 
+                        // goto und goto stop sind zwei getrennte Befehle: ein goto mit Unterbefehl stop und
+                        // gleichzeitig optionalem name auf Elternebene wird von CommandAPI abgelehnt
                         command("goto")
                                 .withPermission(Permission.goto_)
                                 .withShortDescription("fakeplayer.command.goto.description")
                                 .withRequirement(CommandSupports::hasFakeplayer)
-                                .withSubcommands(
-                                        command("stop")
-                                                .withShortDescription("fakeplayer.command.goto.stop.description")
-                                                .withOptionalArguments(fakeplayer("name"))
-                                                .executes(gotoCommand::stopGoTo))
                                 .withArguments(location("location"))
                                 .withOptionalArguments(fakeplayer("name"))
                                 .executes(gotoCommand::goTo),
+                        command("goto")
+                                .withPermission(Permission.goto_)
+                                .withShortDescription("fakeplayer.command.goto.stop.description")
+                                .withRequirement(CommandSupports::hasFakeplayer)
+                                .withArguments(new LiteralArgument("stop"))
+                                .withOptionalArguments(fakeplayer("name"))
+                                .executes(gotoCommand::stopGoTo),
 
                         command("tp")
                                 .withAliases("tpto")
@@ -386,7 +396,6 @@ public class CommandRegistry {
                                                 .executesPlayer(rotationCommand::lookMe),
                                         command("entity")
                                                 .withShortDescription("fakeplayer.command.look.entity.description")
-                                                .withOptionalArguments(fakeplayer("name"))
                                                 .withSubcommands(newActionCommands(ActionType.LOOK_AT_NEAREST_ENTITY))
                                 ),
                         command("turn")

@@ -10,6 +10,7 @@ import io.github.hello09x.fakeplayer.core.config.FakeplayerConfig;
 import io.github.hello09x.fakeplayer.core.config.PreventKicking;
 import io.github.hello09x.fakeplayer.core.constant.MetadataKeys;
 import io.github.hello09x.fakeplayer.core.manager.FakeplayerAutofishManager;
+import io.github.hello09x.fakeplayer.core.manager.FakeplayerList;
 import io.github.hello09x.fakeplayer.core.manager.FakeplayerReplenishManager;
 import io.github.hello09x.fakeplayer.core.manager.FakeplayerSkinManager;
 import io.github.hello09x.fakeplayer.core.manager.action.ActionManager;
@@ -17,6 +18,7 @@ import io.github.hello09x.fakeplayer.core.manager.naming.NameManager;
 import io.github.hello09x.fakeplayer.core.manager.naming.SequenceName;
 import io.github.hello09x.fakeplayer.core.util.Attributes;
 import io.github.hello09x.fakeplayer.core.util.InternalAddressGenerator;
+import io.github.hello09x.fakeplayer.core.util.OfflineCreator;
 import lombok.Getter;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -140,9 +142,12 @@ public class Fakeplayer {
         }
     }
 
-    /**
-     * 按配置为假人设置初始延迟 (ping)
-     */
+    private void debug(@NotNull String message) {
+        if (config.isDebug()) {
+            Main.getInstance().getLogger().info("[spawn-tp] " + message);
+        }
+    }
+
     private void applyConfiguredPing() {
         var pings = config.getCustomPing();
         if (pings == null || pings.isEmpty()) {
@@ -271,12 +276,12 @@ public class Fakeplayer {
                     this.setupName();
                     this.handle.setupClientOptions();   // 处理皮肤设置问题
 
-                    this.teleportToSpawnpoint(option.spawnAt().clone());
+                    var teleport = this.teleportToSpawnpoint(option.spawnAt().clone());
                     if (option.simulationDistance() >= 0) {
                         // 玩家进入世界后再设置, 否则区块追踪还没有建立
                         this.player.setSimulationDistance(option.simulationDistance());
                     }
-                    this.ticker.run();
+                    teleport.whenComplete((ignored, error) -> this.ticker.run());
                 }))
                 .whenComplete((ignored, throwable) -> {
                     if (throwable != null) {
@@ -289,32 +294,71 @@ public class Fakeplayer {
                 });
     }
 
-    /**
-     * 将假人传送到指定位置
-     *
-     * @param to 目标位置
-     */
-    private void teleportToSpawnpoint(@NotNull Location to) {
+    private @NotNull CompletableFuture<Boolean> teleportToSpawnpoint(@NotNull Location to) {
+        var logger = Main.getInstance().getLogger();
         var from = this.player.getLocation();
         var chain = CompletableFuture.completedFuture(true);
 
-        if (from.getWorld().equals(to.getWorld())) {
-            // 如果生成世界等于目的世界, 则需要穿越一次维度才能获取刷怪能力
+        var dimensionHop = Main.getInstance().getConfig().getBoolean("spawn-dimension-hop", true);
+
+        debug("%s: placed at %s %.1f %.1f %.1f, target %s %.1f %.1f %.1f, dimensionHop=%s".formatted(
+                name,
+                from.getWorld().getName(), from.getX(), from.getY(), from.getZ(),
+                to.getWorld().getName(), to.getX(), to.getY(), to.getZ(),
+                dimensionHop
+        ));
+
+        if (dimensionHop && from.getWorld().equals(to.getWorld())) {
             var otherWorld = WorldUtils.getOtherWorld(from.getWorld());
             if (otherWorld == null) {
+                logger.warning("[spawn-tp] %s: no other world found for the dimension hop".formatted(name));
                 this.creator.sendMessage(translatable(
                         "fakeplayer.command.spawn.error.no-mob-spawning-ability",
                         text(player.getName(), WHITE)
                 ).color(GRAY));
             } else {
-                // Folia: 区域线程内禁止同步 teleport, 必须使用 teleportAsync
-                chain = this.player.teleportAsync(otherWorld.getSpawnLocation());
+                chain = this.player.teleportAsync(otherWorld.getSpawnLocation()).thenApply(success -> {
+                    debug("%s: hop to %s -> %s".formatted(name, otherWorld.getName(), success ? "success" : "FAILED"));
+                    return success;
+                });
             }
         }
 
-        chain.thenCompose(ignored -> this.player.teleportAsync(to))
-             .thenAccept(success -> {
-                 if (success) {
+        var result = chain.thenCompose(ignored -> this.player.teleportAsync(to))
+             .thenCompose(success -> {
+                 if (success && this.player.getWorld().equals(to.getWorld())) {
+                     return CompletableFuture.completedFuture(true);
+                 }
+
+                 logger.warning("[spawn-tp] %s: teleport reported %s but player is in %s, retrying in 20 ticks".formatted(
+                         name,
+                         success,
+                         this.player.getWorld().getName()
+                 ));
+
+                 var retry = new CompletableFuture<Boolean>();
+                 Schedulers.globalLater(Main.getInstance(), 20L, () -> {
+                     this.player.teleportAsync(to).whenComplete((retrySuccess, error) -> {
+                         if (error != null) {
+                             retry.completeExceptionally(error);
+                         } else {
+                             retry.complete(retrySuccess);
+                         }
+                     });
+                 });
+                 return retry;
+             })
+             .thenApply(success -> {
+                 var reallyThere = this.player.getWorld().equals(to.getWorld());
+                 var ok = success && reallyThere;
+
+                 debug("%s: final teleport -> %s, actual world %s".formatted(
+                         name,
+                         ok ? "success" : "FAILED",
+                         this.player.getWorld().getName()
+                 ));
+
+                 if (ok) {
                      to.getWorld().playSound(to, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
                  } else {
                      this.creator.sendMessage(translatable(
@@ -324,7 +368,33 @@ public class Fakeplayer {
                  }
                  // 传送会重新拉起「等待客户端加载世界」的倒计时, 假人没法自己回应, 只能在这里替它标记
                  this.handle.markClientLoaded();
+                 return ok;
+             })
+             .exceptionally(throwable -> {
+                 logger.warning("[spawn-tp] %s: teleport threw %s".formatted(name, throwable));
+                 return false;
              });
+
+        this.player.getScheduler().runDelayed(Main.getInstance(), task -> {
+            var now = this.player.getLocation();
+            var sameWorld = now.getWorld().equals(to.getWorld());
+            var distance = sameWorld ? now.distance(to) : -1.0D;
+            var ok = sameWorld && distance < 5.0D;
+            var status = ok ? "OK" : (sameWorld ? "WRONG POSITION" : "WRONG WORLD");
+            var message = "%s: check after 100 ticks: in %s %.1f %.1f %.1f, expected %s %.1f %.1f %.1f -> %s".formatted(
+                    name,
+                    now.getWorld().getName(), now.getX(), now.getY(), now.getZ(),
+                    to.getWorld().getName(), to.getX(), to.getY(), to.getZ(),
+                    status
+            );
+            if (ok) {
+                debug(message);
+            } else {
+                logger.warning("[spawn-tp] " + message);
+            }
+        }, null, 100L);
+
+        return result;
     }
 
     public boolean isOnline() {
@@ -363,10 +433,25 @@ public class Fakeplayer {
      * @return 是否是创建者
      */
     public boolean isCreatedBy(@NotNull CommandSender sender) {
-        if (this.creator instanceof Player pc && sender instanceof Player ps) {
-            return pc.getUniqueId().equals(ps.getUniqueId());
+        var creatorUuid = FakeplayerList.creatorUuid(this.creator);
+        var senderUuid = FakeplayerList.creatorUuid(sender);
+
+        if (creatorUuid != null && senderUuid != null) {
+            return creatorUuid.equals(senderUuid);
         }
-        return creator.getClass() == sender.getClass() && creator.getName().equals(sender.getName());
+
+        // Alte Restore-Datei ohne UUID: Namen vergleichen und die UUID des Spielers merken,
+        // damit der Bot auch nach einer Namensänderung weiter ihm gehört.
+        if (this.creator instanceof OfflineCreator offline && senderUuid != null) {
+            if (!offline.getName().equals(sender.getName())) {
+                return false;
+            }
+            offline.adoptUniqueId(senderUuid);
+            return true;
+        }
+
+        return creator.getClass() == sender.getClass()
+                && creator.getName().equals(sender.getName());
     }
 
     public @NotNull UUID getUUID() {

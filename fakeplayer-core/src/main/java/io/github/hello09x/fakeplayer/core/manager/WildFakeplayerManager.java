@@ -41,6 +41,10 @@ public class WildFakeplayerManager implements PluginMessageListener, Listener {
 
     private final FakeplayerManager manager;
     private final FakeplayerConfig config;
+
+    /**
+     * K: "uuid:&lt;创建者 UUID&gt;" 或 "name:&lt;创建者名称&gt;", V: 连续不在线的次数
+     */
     private final Map<String, AtomicInteger> offline = new HashMap<>();
 
     @Inject
@@ -103,28 +107,52 @@ public class WildFakeplayerManager implements PluginMessageListener, Listener {
     }
 
     /**
+     * 生成分组用的创建者键: 已知 UUID 时用 UUID, 否则用名称
+     */
+    private @NotNull String creatorKey(@NotNull Player target) {
+        var uuid = manager.getCreatorUuid(target);
+        return uuid != null
+                ? "uuid:" + uuid
+                : "name:" + manager.getCreatorName(target);
+    }
+
+    /**
      * 清除所有不在 {@code online} 列表中的玩家的假人
+     * <p>创建者的 UUID 已知时优先用 UUID 判断是否在线 (改名后不会误删);
+     * 从 BungeeCord 收到的列表只有名称, 因此名称匹配作为备用。</p>
      *
-     * @param online 在线玩家
+     * @param online 在线玩家名称
      */
     public void cleanup0(@NotNull Set<String> online) {
-        @SuppressWarnings("all")
+        var onlineUuids = Bukkit.getOnlinePlayers()
+                                .stream()
+                                .map(Player::getUniqueId)
+                                .collect(Collectors.toSet());
+
         var group = manager.getAll()
                            .stream()
-                           .collect(Collectors.groupingBy(manager::getCreatorName));
+                           .collect(Collectors.groupingBy(this::creatorKey));
 
         for (var entry : group.entrySet()) {
-            var creator = entry.getKey();
-            if (creator.equals("CONSOLE")) {
-                continue;
-            }
-
+            var key = entry.getKey();
             var targets = entry.getValue();
-            if (targets.isEmpty() || online.contains(creator)) {
+            if (targets.isEmpty()) {
                 continue;
             }
 
-            if (offline.computeIfAbsent(creator, x -> new AtomicInteger()).incrementAndGet() < CLEANUP_THRESHOLD) {
+            var creatorName = manager.getCreatorName(targets.get(0));
+            if (creatorName == null || creatorName.equals("CONSOLE")) {
+                continue;
+            }
+
+            var creatorUuid = manager.getCreatorUuid(targets.get(0));
+            var isOnline = (creatorUuid != null && onlineUuids.contains(creatorUuid))
+                    || online.contains(creatorName);
+            if (isOnline) {
+                continue;
+            }
+
+            if (offline.computeIfAbsent(key, x -> new AtomicInteger()).incrementAndGet() < CLEANUP_THRESHOLD) {
                 continue;
             }
 
@@ -132,14 +160,17 @@ public class WildFakeplayerManager implements PluginMessageListener, Listener {
                 manager.remove(target.getName(), "Creator offline");
             }
             log.info("%s is offline more than %d ticks, removing %d fake players".formatted(
-                    creator,
+                    creatorName,
                     CLEANUP_PERIOD * CLEANUP_THRESHOLD,
                     targets.size())
             );
         }
 
-        for (var player : online) {
-            offline.remove(player);
+        for (var name : online) {
+            offline.remove("name:" + name);
+        }
+        for (var uuid : onlineUuids) {
+            offline.remove("uuid:" + uuid);
         }
     }
 

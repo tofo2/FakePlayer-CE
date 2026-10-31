@@ -8,6 +8,7 @@ import io.github.hello09x.fakeplayer.core.Main;
 import io.github.hello09x.fakeplayer.core.manager.action.ActionManager;
 import io.github.hello09x.fakeplayer.core.util.Schedulers;
 import io.github.hello09x.fakeplayer.core.config.FakeplayerConfig;
+import io.github.hello09x.fakeplayer.core.constant.MetadataKeys;
 import io.github.hello09x.fakeplayer.core.entity.FakeplayerTicker;
 import io.github.hello09x.fakeplayer.core.repository.model.Feature;
 import io.github.hello09x.fakeplayer.core.util.OfflineCreator;
@@ -31,6 +32,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -50,18 +52,26 @@ public class FakeplayerRestoreManager implements Listener {
     private final static String FILE_NAME = "restore-fakeplayers.txt";
     private final static String SEPARATOR = "|";
     private final static long SNAPSHOT_INTERVAL_TICKS = 20L * 30;
+    private final static long MINIMUM_AGE_TICKS = 100L;
 
     private final FakeplayerManager manager;
     private final FakeplayerConfig config;
     private final ActionManager actionManager;
+    private final FakeplayerList playerList;
 
     private volatile String lastSnapshot;
 
     @Inject
-    public FakeplayerRestoreManager(FakeplayerManager manager, FakeplayerConfig config, ActionManager actionManager) {
+    public FakeplayerRestoreManager(
+            FakeplayerManager manager,
+            FakeplayerConfig config,
+            ActionManager actionManager,
+            FakeplayerList playerList
+    ) {
         this.manager = manager;
         this.config = config;
         this.actionManager = actionManager;
+        this.playerList = playerList;
     }
 
     /**
@@ -90,6 +100,25 @@ public class FakeplayerRestoreManager implements Listener {
             if (creator == null) {
                 continue;
             }
+
+            var spawnedAt = player.getMetadata(MetadataKeys.SPAWNED_AT).stream()
+                    .findFirst()
+                    .map(value -> value.asLong())
+                    .orElse(0L);
+
+            if (Bukkit.getCurrentTick() - spawnedAt < MINIMUM_AGE_TICKS) {
+                log.info("Skipping snapshot for freshly spawned fake player %s".formatted(player.getName()));
+                continue;
+            }
+
+            UUID creatorUuid = null;
+            if (this.playerList != null) {
+                var fakeplayer = this.playerList.getByUUID(player.getUniqueId());
+                if (fakeplayer != null) {
+                    creatorUuid = FakeplayerList.creatorUuid(fakeplayer.getCreator());
+                }
+            }
+
             var location = player.getLocation();
             lines.add(String.join(SEPARATOR,
                     player.getName(),
@@ -101,7 +130,8 @@ public class FakeplayerRestoreManager implements Listener {
                     String.valueOf(location.getYaw()),
                     String.valueOf(location.getPitch()),
                     this.encodeActions(actionManager.getSettings(player)),
-                    this.encodeFeatures(player)
+                    this.encodeFeatures(player),
+                    creatorUuid == null ? "" : creatorUuid.toString()
             ));
         }
 
@@ -139,12 +169,21 @@ public class FakeplayerRestoreManager implements Listener {
             for (var entry : entries) {
                 try {
                     var location = this.resolveLocation(entry);
-                    var player = manager.spawnAsync(new OfflineCreator(entry.creator()), entry.name(), location, lifespan)
+
+                    var creatorName = entry.creator();
+                    if (entry.creatorUuid() != null) {
+                        var currentName = Bukkit.getOfflinePlayer(entry.creatorUuid()).getName();
+                        if (currentName != null && !currentName.isBlank()) {
+                            creatorName = currentName;
+                        }
+                    }
+
+                    var player = manager.spawnAsync(new OfflineCreator(creatorName, entry.creatorUuid()), entry.name(), location, lifespan)
                                          .get(30, TimeUnit.SECONDS);
                     if (player != null) {
                         restored++;
                         this.restoreState(player, entry.features(), entry.actions());
-                        log.info("Restored fake player %s (creator: %s)".formatted(entry.name(), entry.creator()));
+                        log.info("Restored fake player %s (creator: %s)".formatted(entry.name(), creatorName));
                     }
                 } catch (Exception e) {
                     log.warning("Failed to restore fake player %s: %s".formatted(entry.name(), e.getMessage()));
@@ -208,6 +247,33 @@ public class FakeplayerRestoreManager implements Listener {
         if (parts.length < 8 || parts[0].isBlank() || parts[1].isBlank()) {
             return null;
         }
+
+        List<ActionEntry> actions = List.of();
+        List<FeatureEntry> features = List.of();
+        UUID creatorUuid = null;
+
+        if (parts.length > 8) {
+            var field = parts[8].trim();
+            // Alte Test-Datei: Index 8 war direkt die Ersteller-UUID
+            if (isUuidShaped(field)) {
+                creatorUuid = parseUuid(field);
+            } else {
+                actions = this.decodeActions(field);
+            }
+        }
+        if (parts.length > 9) {
+            var field = parts[9].trim();
+            // Zwischenformat: Index 9 war die Ersteller-UUID
+            if (isUuidShaped(field)) {
+                creatorUuid = parseUuid(field);
+            } else {
+                features = this.decodeFeatures(field);
+            }
+        }
+        if (parts.length > 10 && !parts[10].isBlank()) {
+            creatorUuid = parseUuid(parts[10].trim());
+        }
+
         try {
             return new Entry(
                     parts[0],
@@ -218,10 +284,28 @@ public class FakeplayerRestoreManager implements Listener {
                     Double.parseDouble(parts[5]),
                     Float.parseFloat(parts[6]),
                     Float.parseFloat(parts[7]),
-                    parts.length > 9 ? this.decodeFeatures(parts[9]) : List.of(),
-                    parts.length > 8 ? this.decodeActions(parts[8]) : List.of()
+                    features,
+                    actions,
+                    creatorUuid
             );
         } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private boolean isUuidShaped(@NotNull String value) {
+        return value.length() == 36
+                && value.indexOf(',') < 0
+                && value.indexOf('=') < 0
+                && value.indexOf(';') < 0
+                && parseUuid(value) != null;
+    }
+
+    private @Nullable UUID parseUuid(@NotNull String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            log.warning("restore-fakeplayers.txt contains an illegal creator UUID: " + value);
             return null;
         }
     }
@@ -388,7 +472,8 @@ public class FakeplayerRestoreManager implements Listener {
             float yaw,
             float pitch,
             @NotNull List<FeatureEntry> features,
-            @NotNull List<ActionEntry> actions
+            @NotNull List<ActionEntry> actions,
+            @Nullable UUID creatorUuid
     ) {
     }
 
