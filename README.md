@@ -16,10 +16,19 @@ English | [简体中文](README_zh.md) | [繁體中文](README_zh_TW.md)
 
 > **FakePlayer CE** is a community-maintained fork of [FakePlayer](https://github.com/tanyaofei/minecraft-fakeplayer): a server-side plugin inspired by [Carpet-Mod](https://github.com/gnembon/fabric-carpet) that spawns fake players indistinguishable from real ones, rebuilt with Gradle multi-module architecture for **single-jar compatibility from Minecraft `1.20.1` to `26.3`**.
 
+⭐ If you like FakePlayer CE, please give it a star — it really helps the project grow.
+
 ## ⚠️ Community Edition Statement
 
 - This repository is an **independent community fork** — not released, maintained or endorsed by the original author.
 - Report all bugs and feature requests **only to this repository**, never upstream.
+
+## Quick Start
+
+1. Install [CommandAPI](https://commandapi.jorel.dev) into `plugins/`
+2. Put `fakeplayer-fp.buildX.jar` into `plugins/`
+3. Start the server once, then rename `config.tmpl.yml` to `config.yml`
+4. Run `/fp spawn`
 
 ## Features
 
@@ -49,7 +58,7 @@ On first launch only a template `config.tmpl.yml` is generated; rename it to `co
 
 ## AI Chat
 
-`/fp aichat` lets fake players generate chat lines through an OpenAI-compatible endpoint (no MCP required). Fill in `api` and `api-key` (or the environment variable named by `api-key-env`) in `plugins/FakePlayer-CE/ai-chat.yml`, set `enabled: true`, then run `/fp reload`.
+`/fp aichat` lets fake players generate chat lines through an OpenAI-compatible endpoint. Fill in `api` and `api-key` (or the environment variable named by `api-key-env`) in `plugins/FakePlayer-CE/ai-chat.yml`, set `enabled: true`, then run `/fp reload`.
 
 | Command | Description |
 |---|---|
@@ -57,14 +66,14 @@ On first launch only a template `config.tmpl.yml` is generated; rename it to `co
 | `/fp aichat private <player> [once\|continuous\|interval <ticks>] [fake player]` | Send to one player only |
 | `/fp aichat stop [fake player]` | Stop continuous mode |
 
-`system-prompt`, `turn-prompt`, `max-context` and `interval-ticks` in `ai-chat.yml` control the persona, per-turn prompt, retained context and interval. Setting `recent-chat-lines` above 0 also feeds the last N public chat lines into the prompt, so fake players can pick up what players are talking about.
+`auto-reply` is the recommended mode: the fake player answers only when a player says something worth answering (short, symbol-only and spam messages are filtered), paced by `chance` and `cooldown-seconds`. `continuous` talks on a timer, is off by default and needs `allow-continuous: true`. Persona, prompts, retained context and pacing live in `system-prompt`, `turn-prompt`, `max-context`, `recent-chat-lines` and `interval-ticks`.
 
 ## Commands
 
 | Command | Description | Permission | Note |
 |------|---------|---------|------|
 | /fp spawn | Spawn a fake player | fakeplayer.command.spawn | |
-| /fp spawnuuid | Spawn a fake player with a given UUID | fakeplayer.command.spawn.uuid | `<name> <uuid> [world] [location]`; a name bound to another UUID is rejected |
+| /fp spawnuuid | Spawn a fake player with a given UUID | fakeplayer.command.spawn.uuid | `<name> <uuid> [world] [location]`; a name already bound to another UUID is rejected |
 | /fp kick | Kick fake players (remove from the server) | fakeplayer.command.kick | |
 | /fp kickall | Kick all fake players on the server | OP | |
 | /fp kill | Kill fake players (real death, may drop loot) | fakeplayer.command.kill | |
@@ -76,19 +85,19 @@ On first launch only a template `config.tmpl.yml` is generated; rename it to `co
 | /fp drop | Drop held item | fakeplayer.command.drop | |
 | /fp dropstack | Drop entire stack of the held item | fakeplayer.command.dropstack | |
 | /fp dropinv | Drop all items in the inventory | fakeplayer.command.dropinv | |
-| /fp skin | Copy skin from another player | fakeplayer.command.skin | 60 s cooldown for offline players; uses SkinsRestorer when installed (premium names supported) |
+| /fp skin | Copy skin from another player | fakeplayer.command.skin | SkinsRestorer if installed; 60 s cooldown for offline names |
 | /fp invsee | Open a fake player's inventory | fakeplayer.command.invsee | Right-click also works |
-| /fp enderchest | Open a fake player's ender chest | fakeplayer.command.enderchest | Alias `/fp ec`; shift-right-click also works, same world required |
+| /fp enderchest | Open a fake player's ender chest | fakeplayer.command.enderchest | Alias `/fp ec`; shift-right-click; same world |
 | /fp sleep | Sleep | fakeplayer.command.sleep | |
 | /fp wakeup | Wake up | fakeplayer.command.wakeup | |
 | /fp status | Show status | fakeplayer.command.status | |
-| /fp respawn | Respawn a dead fake player | fakeplayer.command.respawn | Requires kick-on-death disabled |
+| /fp respawn | Respawn a dead fake player | fakeplayer.command.respawn | Needs `kick-on-dead: false` |
 | /fp tp | Teleport to a fake player | fakeplayer.command.tp | |
 | /fp tphere | Teleport a fake player to you | fakeplayer.command.tphere | |
 | /fp tps | Swap positions with a fake player | fakeplayer.command.tps | |
 | /fp set | Change one fake player's configuration | fakeplayer.command.set | |
 | /fp setping | Set the ping displayed for a fake player | fakeplayer.command.setping | `0` uses the real value |
-| /fp config | Change default configuration | fakeplayer.command.config | Works from console; `[player]` targets someone else |
+| /fp config | Change default configuration | fakeplayer.command.config | Console-capable; `[player]` = someone else |
 | /fp expme | Transfer exp to you | fakeplayer.command.expme | |
 | /fp attack | Attack | fakeplayer.command.attack | |
 | /fp mine | Mine | fakeplayer.command.mine | |
@@ -98,22 +107,22 @@ On first launch only a template `config.tmpl.yml` is generated; rename it to `co
 | /fp turn | Turn around | fakeplayer.command.turn | |
 | /fp look | Look at specified location | fakeplayer.command.look | |
 | /fp move | Move | fakeplayer.command.move | |
-| /fp goto | Walk to the specified coordinates | fakeplayer.command.goto | Steps up and swims; unreachable targets are rejected; `/fp stop` cancels |
+| /fp goto | Walk to the specified coordinates | fakeplayer.command.goto | Pathfinds around obstacles; rejects unreachable targets |
 | /fp ride | Ride | fakeplayer.command.ride | |
 | /fp sneak | Sneak | fakeplayer.command.sneak | |
 | /fp sprint | Sprint | fakeplayer.command.sprint | |
 | /fp swap | Swap main and off-hand items | fakeplayer.command.swap | |
 | /fp hold | Hold the hotbar item in a slot | fakeplayer.command.hold | |
-| /fp cmd | Execute a command as the fake player | fakeplayer.command.cmd | High risk, see Permissions |
-| /fp say | Send a chat message | fakeplayer.command.say | Goes through chat events, formatter-friendly |
-| /fp aichat | Generate chat lines with AI | fakeplayer.command.aichat | Requires `ai-chat.yml`; `public` / `private` / `stop` |
+| /fp cmd | Execute a command as the fake player | fakeplayer.command.cmd | High risk |
+| /fp say | Send a chat message | fakeplayer.command.say | Formatter-friendly |
+| /fp aichat | Generate chat lines with AI | fakeplayer.command.aichat | Requires `ai-chat.yml` |
 | /fp password | Set fake player login password (stored in the plugin database) | fakeplayer.command.password | Used with `auto-login.command` |
 | /fp changepassword | Change fake player login password (old password optional) | fakeplayer.command.changepassword | |
 | /fp reload | Reload config | OP | |
 
 ## HTTP Admin API
 
-Optional lightweight HTTP API (disabled by default, built on the JDK's built-in HttpServer, no extra dependencies) for web panels and automation.
+Optional lightweight HTTP API (disabled by default, no extra dependencies) for web panels and automation.
 
 ```yaml
 http-admin:
@@ -131,8 +140,7 @@ http-admin:
     list: true           # Every endpoint has a switch of the same name; disabled returns 403
 ```
 
-- The token goes in the `Authorization: Bearer <token>` header only; **`?token=` is not supported** (it leaks into proxy logs and browser history).
-- Paths are matched exactly: `/listfoo` returns `404` and does not fall through to `/list`.
+- The token goes in the `Authorization: Bearer <token>` header only; **`?token=` is not supported**.
 - Parameters always travel in the query string; `GET` and `POST` are both accepted.
 
 | Endpoint | Description |
@@ -173,7 +181,7 @@ http-admin:
 | `wait` | `0` | Ticks to wait before the first execution |
 | `message` | — | Required by `SAY` only |
 
-Success returns `{"status":"success"}` (bulk endpoints add `count`); failures return `{"status":"failure","msg":"..."}`. Common `msg` values: name conflicts with a real player, already online / not found / already dead, missing `action` or `message`, invalid number, `Unknown world`. HTTP-level: `401` missing or wrong token, `403` endpoint disabled or Host not allowed, `404` unknown path, `405`, `414` request too long, `429` rate limited or locked out.
+Success returns `{"status":"success"}` (bulk endpoints add `count`); failures return `{"status":"failure","msg":"..."}` describing the problem. HTTP status: `401` bad token, `403` endpoint disabled or Host not allowed, `404` unknown path, `405` wrong method, `414` URI too long, `429` rate limited or locked out.
 
 ```bash
 TOKEN="YOUR_TOKEN"; API="http://localhost:3253"
@@ -185,9 +193,9 @@ curl -G -H "Authorization: Bearer $TOKEN" "$API/cmd" --data-urlencode "name=klmg
 curl -G -H "Authorization: Bearer $TOKEN" "$API/say" --data-urlencode "name=klmgun" --data-urlencode "message=hello world"
 ```
 
-### Security
+## Security
 
-Built-in protections (no configuration needed): constant-time token comparison; **authentication before the endpoint switch** (401/403 cannot be used to enumerate enabled endpoints); exact path matching; `token` parameters redacted and control characters replaced in logs; 120 requests per IP per minute with a 60-second lockout after 10 consecutive failures; optional `allowed-hosts` Host / cross-origin `Origin` checks against DNS rebinding; URIs over 4096 characters return `414` and responses carry `Cache-Control: no-store`.
+Built in, no configuration needed: **authentication before the endpoint switch**, so `401`/`403` cannot be used to probe which endpoints are enabled; token redaction and control-character replacement in logs; per-IP rate limiting with lockout after repeated failures; optional `allowed-hosts` Host / `Origin` checks; `Cache-Control: no-store` on responses.
 
 Still up to the administrator:
 
@@ -212,9 +220,9 @@ Each player can save their own defaults; changes apply on the **next spawn**. Us
 | `autofish` | Enable auto-fishing |
 | `simulation_distance` | Simulation distance (chunk radius) of the fake player; `-1` keeps the world setting |
 
-- **`replace_tools`**: follows GCA's default mode — non-Mending tools are replaced after they break; Mending tools are replaced at `tool-replacement.remaining-durability-threshold` (default `10`) when a qualifying replacement is available. Matching uses item type (enchantments ignored) and picks the first eligible item in inventory order.
-- **`replenish`**: `/fp drop` and `/fp dropstack` refill the main hand; milk buckets, stews, honey bottles and drinkable potions are refilled with their returned container when it fits, otherwise the container stays in hand. `/fp dropinv` never refills.
-- **`simulation_distance`**: the chunk radius ticking around the fake player. Set the global default under `default-features` in `config.yml`; `/fp config set simulation_distance 8` applies to that creator's fake players, and `/fp set <name> simulation_distance 8` changes a single one. `-1` uses the world setting.
+- **`replace_tools`**: GCA-style — broken non-Mending tools, and Mending tools worn below `tool-replacement.remaining-durability-threshold` (default `10`), are swapped for an identical item from the inventory; enchantments are ignored.
+- **`replenish`**: `/fp drop` and `/fp dropstack` refill the main hand; food and drink containers come back when they fit. `/fp dropinv` never refills.
+- **`simulation_distance`**: chunk radius ticking around the fake player; set the default under `default-features`, override with `/fp config set` or `/fp set`.
 
 ## Permissions
 
@@ -277,10 +285,9 @@ With a login plugin installed, fake players would be kicked or frozen for not lo
 |---|---|---|
 | AuthMe / AuthMeReloaded | `forceLogin` / `forceRegister` | Marked logged in via the public API; unregistered names are auto-registered with a random short password |
 | CatSeedLogin / ReCatSeedLogin | Login list | Written into its `loginPlayers` list, so `auto-kick` leaves them alone |
-| LibreLogin (Paper) / LibreLoginNext (Paper) | API authorization | A temporary passwordless record is created while online and removed on disconnect / shutdown; existing records are reused only when capitalisation matches, and a crash may leave one behind |
+| LibreLogin (Paper) / LibreLoginNext (Paper) | API authorization | Temporary passwordless record while online, removed on disconnect |
 
-- **Automatic**: declared as `softdepend`, loaded only when the plugin is installed; all calls go through reflection, with no compile-time dependency.
-- Related issues: #17 (framework), #18 (CatSeedLogin), #19 (AuthMe), #26 (LibreLogin).
+- **Automatic**: no configuration needed — each plugin is only used when it is installed.
 
 ### Auto-login (two independent mechanisms)
 
@@ -307,7 +314,7 @@ Both can be active at once; when the API exemption already works, the command te
 
 ### Chat event compatibility (`/fp say`)
 
-`/fp say` goes through `handle.connection.chat(...)`, fully triggering `AsyncPlayerChatEvent` and `AsyncChatEvent`, so EssentialsX Chat, Vane and similar plugins can rewrite format and content; the message is broadcast per the event result unless cancelled. This behaves the same on every supported version (`1.20.1 ~ 26.3`). Related issue / PR: #21 / #22.
+`/fp say` fully triggers `AsyncPlayerChatEvent` and `AsyncChatEvent`, so EssentialsX Chat, Vane and similar plugins can rewrite format and content; the message is broadcast unless the event is cancelled. Works the same on every supported version (`1.20.1 ~ 26.3`).
 
 ## FAQ
 
