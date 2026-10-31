@@ -92,9 +92,22 @@ public class Fakeplayer {
     @UnknownNullability
     private NMSNetwork network;
 
+    /**
+     * 初始延迟 (ping), 负数表示不模拟
+     */
     private volatile int firstPing = -1;
+
+    /**
+     * 当前延迟, 会在初始值附近小幅波动 (仅用于显示)
+     */
     private volatile int currentPing = -1;
 
+    /**
+     * @param creator      创建者
+     * @param creatorIp    创建者 IP
+     * @param sequenceName 序列名
+     * @param lifespan     存活时间
+     */
     public Fakeplayer(
             @NotNull CommandSender creator,
             @NotNull String creatorIp,
@@ -123,8 +136,10 @@ public class Fakeplayer {
         this.ticker = new FakeplayerTicker(this, lifespan);
         this.player.setPersistent(config.isPersistData());
         this.player.setSleepingIgnored(true);
-        this.handle.setPlayBefore();
-        this.handle.disableAdvancements(Main.getInstance());
+        this.handle.setPlayBefore(); // 可避免一些插件的第一次入服欢迎信息
+        if (!config.isAdvancements()) {
+            this.handle.disableAdvancements(Main.getInstance()); // 不授予成就, 也不播报
+        }
     }
 
     private void debug(@NotNull String message) {
@@ -145,12 +160,20 @@ public class Fakeplayer {
         this.setPing(ping);
     }
 
+    /**
+     * 设置假人显示使用的延迟 (ping)
+     *
+     * @param ping 延迟 (毫秒), 负数表示改回使用服务端计算出的真实值
+     */
     public void setPing(int ping) {
         this.firstPing = ping;
         this.currentPing = ping;
         this.pushPing(ping, true);
     }
 
+    /**
+     * 让延迟在设定值附近小幅波动, 避免 Tab 列表里一直显示同一个固定值
+     */
     public void updateDynamicPing() {
         var base = this.firstPing;
         if (base < 0) {
@@ -176,6 +199,9 @@ public class Fakeplayer {
         network.getServerGamePacketListener().setPing(ping, broadcast);
     }
 
+    /**
+     * 让假人诞生
+     */
     public CompletableFuture<Void> spawnAsync(@NotNull SpawnOption option) {
         var address = ipGen.next();
         return Schedulers
@@ -214,6 +240,10 @@ public class Fakeplayer {
                     }
 
                     if (config.isDropInventoryOnQuiting() && !nameManager.isRealPlayerUUID(this.uuid)) {
+                        // 跨服背包同步插件可能导致假人既丢弃了一份到地上，在重新生成的时候又回来了
+                        // 因此在生成的时候清空一次背包
+                        // 但无法解决登陆后延迟同步背包的情况
+                        // 如果该假人使用了真实玩家的 UUID(已玩过), 则保留其原有数据, 不清空背包
                         this.player.getInventory().clear();
                     }
 
@@ -241,10 +271,10 @@ public class Fakeplayer {
                     this.applyConfiguredPing();
                     this.player.setHealth(Optional.ofNullable(this.player.getAttribute(Attributes.maxHealth()))
                                                   .map(AttributeInstance::getValue)
-                                                  .orElse(20D));
+                                                  .orElse(20D));    // 恢复生命值
                     this.player.setFoodLevel(20);
                     this.setupName();
-                    this.handle.setupClientOptions();
+                    this.handle.setupClientOptions();   // 处理皮肤设置问题
 
                     var teleport = this.teleportToSpawnpoint(option.spawnAt().clone());
                     if (option.simulationDistance() >= 0) {
@@ -336,6 +366,8 @@ public class Fakeplayer {
                              text(player.getName(), WHITE)
                      ).color(GRAY));
                  }
+                 // 传送会重新拉起「等待客户端加载世界」的倒计时, 假人没法自己回应, 只能在这里替它标记
+                 this.handle.markClientLoaded();
                  return ok;
              })
              .exceptionally(throwable -> {
@@ -393,6 +425,13 @@ public class Fakeplayer {
         return event;
     }
 
+    /**
+     * 判断是否是创建者
+     * <p>如果玩家下线再重新登陆, entityID 将会不一样导致 {@link Object#equals(Object)} 返回 {@code false}</p>
+     *
+     * @param sender 命令执行者
+     * @return 是否是创建者
+     */
     public boolean isCreatedBy(@NotNull CommandSender sender) {
         var creatorUuid = FakeplayerList.creatorUuid(this.creator);
         var senderUuid = FakeplayerList.creatorUuid(sender);
