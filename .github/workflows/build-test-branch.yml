@@ -41,7 +41,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: fakeplayer-ce-test-no-dimension-hop
-          path: fakeplayer-dist/build/libs/*.jar
+          path: build/libs/*.jar
+          archive: false
+          if-no-files-found: error
           if-no-files-found: error
           retention-days: 14
