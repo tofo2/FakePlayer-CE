@@ -1,16 +1,19 @@
+<div align="center">
+
+<img src=".github/assets/logo.png" alt="FakePlayer CE" width="200">
+
 # FakePlayer CE (Community Edition)
 
-<div align="center">
+English | [简体中文](README_zh.md) | [繁體中文](README_zh_TW.md) | [日本語](README_ja.md)
 
 [![CI](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml/badge.svg)](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/EndlessPixel-Studio/FakePlayer-CE)](LICENSE.txt)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20~%2026.3-5fbb47)](https://github.com/EndlessPixel-Studio/FakePlayer-CE)
+[![Hangar](https://img.shields.io/badge/Hangar-FakePlayer--CE-1f7ae0)](https://hangar.papermc.io/EndlessPixel/FakePlayer-CE)
 [![Built with JDK 25](https://img.shields.io/badge/Built%20with-JDK%2025-ED8B00?logo=openjdk&logoColor=white)](https://www.java.com)
 [![Platforms](https://img.shields.io/badge/Platforms-Paper%20%7C%20Spigot%20%7C%20Purpur-2d2d2d)](https://github.com/EndlessPixel-Studio/FakePlayer-CE)
 
 </div>
-
-English | [简体中文](README_zh.md) | [繁體中文](README_zh_TW.md)
 
 ---
 
@@ -50,6 +53,7 @@ English | [简体中文](README_zh.md) | [繁體中文](README_zh_TW.md)
 FakePlayer CE ships as a single `fakeplayer-fp.buildX.jar`. Drop it into your server's `plugins/` folder and restart (CommandAPI must be installed first).
 
 - **Stable**: [GitHub Releases](https://github.com/EndlessPixel-Studio/FakePlayer-CE/releases) (recommended)
+- **Hangar**: [hangar.papermc.io/EndlessPixel/FakePlayer-CE](https://hangar.papermc.io/EndlessPixel/FakePlayer-CE) — download and update from the web panel
 - **Latest build**: [GitHub Actions](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions) → any successful run → Artifacts → `fakeplayer-dist`
 
 ## Config File
@@ -107,7 +111,7 @@ On first launch only a template `config.tmpl.yml` is generated; rename it to `co
 | /fp turn | Turn around | fakeplayer.command.turn | |
 | /fp look | Look at specified location | fakeplayer.command.look | |
 | /fp move | Move | fakeplayer.command.move | |
-| /fp goto | Walk to the specified coordinates | fakeplayer.command.goto | Pathfinds around obstacles; rejects unreachable targets |
+| /fp goto | Walk to the specified coordinates | fakeplayer.command.goto | Pathfinds around obstacles; rejects unreachable targets; `/fp goto stop` cancels |
 | /fp ride | Ride | fakeplayer.command.ride | |
 | /fp sneak | Sneak | fakeplayer.command.sneak | |
 | /fp sprint | Sprint | fakeplayer.command.sprint | |
@@ -273,7 +277,7 @@ Features: `fakeplayer.config.replenish`, `fakeplayer.config.replenish.chest` (re
 
 ## Custom Translation
 
-Built-in locales: `en`, `zh`, `zh_tw`, `zh_hk`. Switch with `i18n.locale` in `config.yml` (then `/fp reload`).
+Built-in locales: `en`, `zh`, `zh_tw`, `zh_hk`, `ja`. Switch with `i18n.locale` in `config.yml` (then `/fp reload`).
 
 Custom: drop `message_<language>_<region>.properties` (copy the [template](fakeplayer-core/src/main/resources/message/message.properties)) into `plugins/fakeplayer/message/`, set `i18n.locale` to the matching suffix (e.g. `en_us`), and run `/fp reload-translation`. Files must be **UTF-8** encoded.
 
@@ -347,3 +351,7 @@ auto-login:
 ## Build
 
 See [BUILD.md](./BUILD.md). It applies to this project's Gradle multi-module workflow only, not to the upstream Maven build.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=EndlessPixel-Studio/FakePlayer-CE&type=Date)](https://star-history.com/#EndlessPixel-Studio/FakePlayer-CE&Date)

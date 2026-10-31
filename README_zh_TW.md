@@ -1,16 +1,19 @@
+<div align="center">
+
+<img src=".github/assets/logo.png" alt="FakePlayer CE" width="200">
+
 # FakePlayer CE（社群版）
 
-<div align="center">
+[English](README.md) | [简体中文](README_zh.md) | 繁體中文 | [日本語](README_ja.md)
 
 [![CI](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml/badge.svg)](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/EndlessPixel-Studio/FakePlayer-CE)](LICENSE.txt)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20~%2026.3-5fbb47)](https://github.com/EndlessPixel-Studio/FakePlayer-CE)
+[![Hangar](https://img.shields.io/badge/Hangar-FakePlayer--CE-1f7ae0)](https://hangar.papermc.io/EndlessPixel/FakePlayer-CE)
 [![Built with JDK 25](https://img.shields.io/badge/Built%20with-JDK%2025-ED8B00?logo=openjdk&logoColor=white)](https://www.java.com)
 [![Platforms](https://img.shields.io/badge/Platforms-Paper%20%7C%20Spigot%20%7C%20Purpur-2d2d2d)](https://github.com/EndlessPixel-Studio/FakePlayer-CE)
 
 </div>
-
-[English](README.md) | [简体中文](README_zh.md) | 繁體中文
 
 ---
 
@@ -50,6 +53,7 @@
 發布物為單一 `fakeplayer-fp.buildX.jar`，放入伺服器端 `plugins/` 目錄並重新啟動即可（需先安裝 CommandAPI）。
 
 - **穩定版**：[GitHub Releases](https://github.com/EndlessPixel-Studio/FakePlayer-CE/releases)（推薦）
+- **Hangar**：[hangar.papermc.io/EndlessPixel/FakePlayer-CE](https://hangar.papermc.io/EndlessPixel/FakePlayer-CE)，可在網頁端直接下載與更新
 - **最新建置**：[GitHub Actions](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions) → 任一次成功的執行 → Artifacts → `fakeplayer-dist`
 
 ## 設定檔說明
@@ -107,7 +111,7 @@
 | /fp turn | 假人原地轉向 | fakeplayer.command.turn | |
 | /fp look | 假人看向指定座標 | fakeplayer.command.look | |
 | /fp move | 假人定向移動 | fakeplayer.command.move | |
-| /fp goto | 讓假人尋路前往指定座標 | fakeplayer.command.goto | 自動尋路；無法抵達則拒絕 |
+| /fp goto | 讓假人尋路前往指定座標 | fakeplayer.command.goto | 自動尋路；無法抵達則拒絕；`/fp goto stop` 可中止 |
 | /fp ride | 假人騎乘實體 | fakeplayer.command.ride | |
 | /fp sneak | 假人進入潛行模式 | fakeplayer.command.sneak | |
 | /fp sprint | 假人疾跑 | fakeplayer.command.sprint | |
@@ -273,7 +277,7 @@ curl -G -H "Authorization: Bearer $TOKEN" "$API/say" --data-urlencode "name=klmg
 
 ## 自訂本地化翻譯
 
-內建 `en` / `zh` / `zh_tw` / `zh_hk`，改 `config.yml` 的 `i18n.locale` 切換（之後 `/fp reload`）。
+內建 `en` / `zh` / `zh_tw` / `zh_hk` / `ja`，改 `config.yml` 的 `i18n.locale` 切換（之後 `/fp reload`）。
 
 自訂：在 `plugins/fakeplayer/message/` 放入 `message_<語言>_<地區>.properties`（複製[範本](fakeplayer-core/src/main/resources/message/message.properties)後修改），把 `i18n.locale` 設為對應後綴（如 `zh_cn`），執行 `/fp reload-translation` 生效。檔案必須使用 **UTF-8** 編碼。
 
@@ -347,3 +351,7 @@ auto-login:
 ## 專案建置
 
 詳見 [BUILD_zh_TW.md](./BUILD_zh_TW.md)。該文件只適用於本專案的 Gradle 多模組流程，不能用於上游 Maven 架構。
+
+## Star 趨勢
+
+[![Star History Chart](https://api.star-history.com/svg?repos=EndlessPixel-Studio/FakePlayer-CE&type=Date)](https://star-history.com/#EndlessPixel-Studio/FakePlayer-CE&Date)

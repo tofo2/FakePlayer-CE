@@ -26,6 +26,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -47,9 +48,12 @@ import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -415,13 +419,18 @@ public class HttpAdminService {
 
         var location = Bukkit.getWorlds().get(0).getSpawnLocation().clone();
         var lifespan = Optional.ofNullable(config.getLifespan()).map(Duration::toMillis).orElse(FakeplayerTicker.NON_REMOVE_AT);
+        var future = manager.spawnAsync(Bukkit.getConsoleSender(), name, location, lifespan);
         try {
-            var player = manager.spawnAsync(Bukkit.getConsoleSender(), name, location, lifespan).get(15, TimeUnit.SECONDS);
+            var player = future.get(15, TimeUnit.SECONDS);
             if (player == null) {
                 sendJson(ex, 500, "failure", "Spawn failed");
             } else {
                 sendJson(ex, 200, "success", null);
             }
+        } catch (TimeoutException e) {
+            // 生成仍在后台继续, 只是这次请求等不到结果了
+            future.cancel(false);
+            sendJson(ex, 504, "failure", "Spawn is still in progress, check /list later");
         } catch (Exception e) {
             sendJson(ex, 500, "failure", rootMsg(e));
         }
@@ -463,7 +472,7 @@ public class HttpAdminService {
             return;
         }
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 fake.setHealth(0D);
                 return null;
             });
@@ -493,7 +502,7 @@ public class HttpAdminService {
             return;
         }
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 var setting = ActionSetting.once().clone();
                 setting.message = message;
                 actionManager.setAction(fake, ActionType.SAY, setting);
@@ -559,7 +568,7 @@ public class HttpAdminService {
         }
         var chatTarget = target;
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 if (continuous) {
                     aiChatManager.start(fake, chatTarget, interval);
                 } else {
@@ -582,7 +591,7 @@ public class HttpAdminService {
             return;
         }
         try {
-            var stopped = callSync(() -> aiChatManager.stop(fake));
+            var stopped = callOnEntity(fake, () -> aiChatManager.stop(fake));
             var payload = new LinkedHashMap<String, Object>();
             payload.put("status", "success");
             payload.put("stopped", stopped);
@@ -705,7 +714,7 @@ public class HttpAdminService {
         }
 
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 actionManager.setAction(fake, action, new ActionSetting(maximum, tickInterval, waitTicks, message));
                 return null;
             });
@@ -724,7 +733,7 @@ public class HttpAdminService {
             return;
         }
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 actionManager.stop(fake);
                 return null;
             });
@@ -771,7 +780,7 @@ public class HttpAdminService {
         final World targetWorld = world;
 
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 var current = fake.getLocation();
                 var target = new Location(
                         targetWorld == null ? current.getWorld() : targetWorld,
@@ -845,7 +854,7 @@ public class HttpAdminService {
         final String targetDirection = direction;
         final double[] targetAt = at;
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 var handle = bridge.fromPlayer(fake);
                 if (targetDirection != null) {
                     switch (targetDirection) {
@@ -901,7 +910,7 @@ public class HttpAdminService {
             return;
         }
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 fake.getInventory().setHeldItemSlot(slot - 1);
                 return null;
             });
@@ -920,7 +929,7 @@ public class HttpAdminService {
             return;
         }
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 bridge.fromPlayer(fake).swapItemWithOffhand();
                 return null;
             });
@@ -993,7 +1002,7 @@ public class HttpAdminService {
         setting.targetY = stand.getY();
         setting.targetZ = stand.getZ();
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 actionManager.setAction(fake, ActionType.GOTO, setting);
                 return null;
             });
@@ -1027,7 +1036,15 @@ public class HttpAdminService {
             sendJson(ex, 400, "failure", "The dummy does not exist.");
             return;
         }
-        target.setPing(ping);
+        try {
+            callOnEntity(fake, () -> {
+                target.setPing(ping);
+                return null;
+            });
+        } catch (Exception e) {
+            sendJson(ex, 500, "failure", e.getMessage());
+            return;
+        }
         sendJson(ex, 200, "success", null);
     }
 
@@ -1063,7 +1080,7 @@ public class HttpAdminService {
             return;
         }
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 if (sneak) {
                     fake.setSneaking(state);
                 } else {
@@ -1101,11 +1118,11 @@ public class HttpAdminService {
             return;
         }
         try {
-            if (!callSync(fake::isDead)) {
+            if (!callOnEntity(fake, fake::isDead)) {
                 sendJson(ex, 400, "failure", "The dummy is not dead.");
                 return;
             }
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 bridge.fromPlayer(fake).respawn();
                 return null;
             });
@@ -1129,7 +1146,7 @@ public class HttpAdminService {
             return;
         }
         try {
-            callSync(() -> {
+            callOnEntity(fake, () -> {
                 manager.issueCommands(fake, List.of(command));
                 return null;
             });
@@ -1306,6 +1323,35 @@ public class HttpAdminService {
 
     private static <T> T callSync(Callable<T> callable) throws Exception {
         return Schedulers.callGlobal(Main.getInstance(), callable).get(10, TimeUnit.SECONDS);
+    }
+
+    /**
+     * 在假人所属的实体线程执行并等待结果。
+     * <p>Folia 下实体只能在其所属区域线程操作, 全局线程也不行; Paper 下等价于主线程。</p>
+     */
+    private static <T> T callOnEntity(@NotNull Player player, @NotNull Callable<T> callable) throws Exception {
+        var done = new CountDownLatch(1);
+        var failure = new AtomicReference<Throwable>();
+        var result = new AtomicReference<T>();
+        var scheduled = Schedulers.entity(Main.getInstance(), player, () -> {
+            try {
+                result.set(callable.call());
+            } catch (Throwable t) {
+                failure.set(t);
+            } finally {
+                done.countDown();
+            }
+        });
+        if (scheduled == null) {
+            throw new IllegalStateException("Fake player is no longer available");
+        }
+        if (!done.await(5, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("Timed out waiting for the fake player thread");
+        }
+        if (failure.get() != null) {
+            throw new IllegalStateException(String.valueOf(failure.get().getMessage()));
+        }
+        return result.get();
     }
 
     private boolean authorize(HttpExchange ex) {

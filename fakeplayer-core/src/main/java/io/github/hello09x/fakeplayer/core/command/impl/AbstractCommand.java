@@ -82,6 +82,15 @@ public abstract class AbstractCommand {
         }
         var locale = TranslatorUtils.getLocale(sender);
 
+        // 明确给了名字却没匹配到: 不能退回到「选中/唯一」的假人,
+        // 否则名字打错时会去操作另一个假人
+        if (!ignoreName && args.getRaw("name") != null) {
+            throw CommandAPI.failWithString(ComponentUtils.toString(
+                    translatable("fakeplayer.command.generic.error.non-matching-fake-player"),
+                    locale
+            ));
+        }
+
         var all = manager.getAll(sender, predicate);
         var count = all.size();
         return switch (count) {
@@ -114,31 +123,38 @@ public abstract class AbstractCommand {
         @SuppressWarnings("unchecked")
         var players = (List<Player>) args.get("names");
 
-        // 优先选中的假人
-        if (players == null || players.isEmpty()) {
-            var fake = manager.getSelection(sender);
-            if (fake != null) {
-                return Collections.singletonList(fake);
-            }
+        // 给了名字却一个都没匹配上: 直接报错, 不能退回到「选中/唯一」的假人,
+        // 否则名字打错时会误操作另一个假人
+        if (players != null && players.isEmpty()) {
+            throw CommandAPI.failWithString(ComponentUtils.toString(
+                    translatable("fakeplayer.command.generic.error.non-matching-fake-player"),
+                    TranslatorUtils.getLocale(sender)
+            ));
         }
 
-        // 查找唯一假人
-        if (players == null || players.isEmpty()) {
-            var fakeplayers = manager.getAll(sender);
-            return switch (fakeplayers.size()) {
-                case 1 -> fakeplayers;
-                case 0 -> throw CommandAPI.failWithString(ComponentUtils.toString(
-                        translatable("fakeplayer.command.generic.error.non-fake-player"),
-                        TranslatorUtils.getLocale(sender)
-                ));
-                default -> throw CommandAPI.failWithString(ComponentUtils.toString(
-                        translatable("fakeplayer.command.generic.error.name-required"),
-                        TranslatorUtils.getLocale(sender)
-                ));
-            };
+        if (players != null) {
+            return players;
         }
 
-        return players;
+        // 未指定名字: 优先选中的假人
+        var fake = manager.getSelection(sender);
+        if (fake != null) {
+            return Collections.singletonList(fake);
+        }
+
+        // 其次唯一假人
+        var fakeplayers = manager.getAll(sender);
+        return switch (fakeplayers.size()) {
+            case 1 -> fakeplayers;
+            case 0 -> throw CommandAPI.failWithString(ComponentUtils.toString(
+                    translatable("fakeplayer.command.generic.error.non-fake-player"),
+                    TranslatorUtils.getLocale(sender)
+            ));
+            default -> throw CommandAPI.failWithString(ComponentUtils.toString(
+                    translatable("fakeplayer.command.generic.error.name-required"),
+                    TranslatorUtils.getLocale(sender)
+            ));
+        };
     }
 
 }

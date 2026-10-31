@@ -259,6 +259,11 @@ public class CommandRegistry {
                                 .withPermission(Permission.goto_)
                                 .withShortDescription("fakeplayer.command.goto.description")
                                 .withRequirement(CommandSupports::hasFakeplayer)
+                                .withSubcommands(
+                                        command("stop")
+                                                .withShortDescription("fakeplayer.command.goto.stop.description")
+                                                .withOptionalArguments(fakeplayer("name"))
+                                                .executes(gotoCommand::stopGoTo))
                                 .withArguments(location("location"))
                                 .withOptionalArguments(fakeplayer("name"))
                                 .executes(gotoCommand::goTo),
@@ -549,12 +554,7 @@ public class CommandRegistry {
                                         command("stop")
                                                 .withShortDescription("fakeplayer.command.say.stop")
                                                 .withOptionalArguments(fakeplayer("name"))
-                                                .executes(sayCommand.say(ActionSetting.stop())),
-                                        command("help")
-                                                .withShortDescription("fakeplayer.command.say.help")
-                                                .executes((sender, args) -> {
-                                                    sender.sendMessage(translatable("fakeplayer.command.say.help"));
-                                                })
+                                                .executes(sayCommand.say(ActionSetting.stop()))
                                 ),
 
                         command("aichat")

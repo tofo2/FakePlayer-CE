@@ -39,7 +39,8 @@ public class ActionManager {
     ) {
         return Optional.ofNullable(this.managers.get(player.getUniqueId()))
                        .map(manager -> manager.get(action))
-                       .filter(ac -> ac.getSetting().remains > 0)
+                       // -1 表示持续执行 (continuous) 的动作, 与 getActiveActions 的判定保持一致
+                       .filter(ac -> ac.getSetting().remains > 0 || ac.getSetting().remains == -1)
                        .isPresent();
     }
 
@@ -94,6 +95,21 @@ public class ActionManager {
         managers.put(action, bridge.createAction(player, action, setting));
     }
 
+    /**
+     * 立即执行一次动作, 不经过 ticker
+     * <p>同一 tick 内连续调用时, 走 ticker 会被后一次覆盖, 前一次永远不执行 (如连续 /fp say once 丢消息), 这里直接执行。</p>
+     * <p>必须在假人所属的实体线程调用。</p>
+     */
+    public void executeOnce(
+            @NotNull Player player,
+            @NotNull ActionType action,
+            @NotNull ActionSetting setting
+    ) {
+        var oneShot = setting.clone();
+        oneShot.remains = 1;
+        bridge.createAction(player, action, oneShot).tick();
+    }
+
     public void stop(@NotNull Player player) {
         var managers = this.managers.get(player.getUniqueId());
         if (managers == null || managers.isEmpty()) {
@@ -101,7 +117,8 @@ public class ActionManager {
         }
 
         for (var entry : managers.entrySet()) {
-            if (!entry.getValue().equals(ActionSetting.stop())) {
+            // 原先把 ticker 直接和 ActionSetting 比 equals，类型不同恒 false，守卫一直没生效
+            if (!entry.getValue().getSetting().equals(ActionSetting.stop())) {
                 entry.setValue(bridge.createAction(player, entry.getKey(), ActionSetting.stop()));
             }
         }

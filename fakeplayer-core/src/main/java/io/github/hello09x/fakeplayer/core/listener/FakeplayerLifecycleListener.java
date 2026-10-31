@@ -8,7 +8,6 @@ import io.github.hello09x.fakeplayer.core.config.FakeplayerConfig;
 import io.github.hello09x.fakeplayer.core.manager.FakeplayerManager;
 import io.github.hello09x.fakeplayer.core.repository.FakeplayerAuthRepository;
 import io.github.hello09x.fakeplayer.core.util.Schedulers;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -18,6 +17,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 
 import static net.kyori.adventure.text.Component.text;
+import static net.kyori.adventure.text.Component.translatable;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -131,7 +131,7 @@ public class FakeplayerLifecycleListener implements Listener {
             authRepository.saveOrUpdate(player.getName(), password);
             var creator = this.manager.getCreator(player);
             if (creator != null) {
-                creator.sendMessage(text("已为假人 " + player.getName() + " 随机生成登录密码: " + password));
+                creator.sendMessage(translatable("fakeplayer.command.password.generated", text(player.getName()), text(password)));
             }
         }
 
