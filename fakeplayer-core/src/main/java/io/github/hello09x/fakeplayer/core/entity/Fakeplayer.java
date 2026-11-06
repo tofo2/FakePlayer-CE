@@ -207,6 +207,16 @@ public class Fakeplayer {
                     Main.getInstance(),
                     option.spawnAt(),
                     () -> {
+                      // Zweite Sicherung: Ist bereits ein anderer Spieler mit derselben UUID
+                      // online, darf dieser Spawn nicht in die Spielerliste eingefuegt werden.
+                      var existing = Bukkit.getPlayer(this.uuid);
+                      if (existing != null && existing.getEntityId() != this.player.getEntityId()) {
+                        throw new CommandException(
+                            translatable(
+                                    "fakeplayer.spawn.error.name.online", text(this.name, GOLD))
+                                .color(RED));
+                      }
+
                       this.player.setMetadata(
                           MetadataKeys.SPAWNED_AT,
                           new FixedMetadataValue(Main.getInstance(), Bukkit.getCurrentTick()));
