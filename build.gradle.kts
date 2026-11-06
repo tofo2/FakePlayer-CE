@@ -48,9 +48,11 @@ subprojects {
     // deshalb nur für das Einrichten der Dev-Bundles ein JDK 21 verwenden.
     // Entfernen, sobald paperweight eine korrigierte codebook-Version mitbringt.
     pluginManager.withPlugin("io.papermc.paperweight.userdev") {
-        extensions.configure<io.papermc.paperweight.userdev.PaperweightUserExtension> {
-            javaLauncher = javaToolchains.launcherFor {
-                languageVersion = JavaLanguageVersion.of(21)
+        if (!name.startsWith("fakeplayer-v26")) {
+            extensions.configure<io.papermc.paperweight.userdev.PaperweightUserExtension> {
+                javaLauncher = javaToolchains.launcherFor {
+                    languageVersion = JavaLanguageVersion.of(21)
+                }
             }
         }
     }
