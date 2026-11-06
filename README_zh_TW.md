@@ -7,7 +7,7 @@
 [English](README.md) | [简体中文](README_zh.md) | 繁體中文 | [日本語](README_ja.md)
 
 [![CI](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml/badge.svg)](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/EndlessPixel-Studio/FakePlayer-CE)](LICENSE.txt)
+[![License](https://img.shields.io/github/license/EndlessPixel-Studio/FakePlayer-CE)](LICENSE)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20~%2026.3-5fbb47)](https://github.com/EndlessPixel-Studio/FakePlayer-CE)
 [![Hangar](https://img.shields.io/badge/Hangar-FakePlayer--CE-1f7ae0)](https://hangar.papermc.io/EndlessPixel/FakePlayer-CE)
 [![Built with JDK 25](https://img.shields.io/badge/Built%20with-JDK%2025-ED8B00?logo=openjdk&logoColor=white)](https://www.java.com)
@@ -111,7 +111,8 @@
 | /fp turn | 假人原地轉向 | fakeplayer.command.turn | |
 | /fp look | 假人看向指定座標 | fakeplayer.command.look | |
 | /fp move | 假人定向移動 | fakeplayer.command.move | |
-| /fp goto | 讓假人尋路前往指定座標 | fakeplayer.command.goto | 自動尋路；無法抵達則拒絕；`/fp goto stop` 可中止 |
+| /fp goto | 讓假人尋路前往指定座標 | fakeplayer.command.goto | 自動尋路；無法抵達則拒絕 |
+| /fp gotostop | 中止正在進行的尋路 | fakeplayer.command.goto | 不影響其它動作 |
 | /fp ride | 假人騎乘實體 | fakeplayer.command.ride | |
 | /fp sneak | 假人進入潛行模式 | fakeplayer.command.sneak | |
 | /fp sprint | 假人疾跑 | fakeplayer.command.sprint | |
@@ -123,6 +124,9 @@
 | /fp password | 設定假人登入密碼（存入插件資料庫） | fakeplayer.command.password | 搭配 `auto-login.command` 使用 |
 | /fp changepassword | 修改假人登入密碼（舊密碼可省略） | fakeplayer.command.changepassword | |
 | /fp reload | 重新載入插件設定檔 | OP | |
+| /fp update check | 檢查 GitHub 上是否有新版本 | OP | |
+| /fp version | 顯示插件、伺服端與 Java 版本 | - | 所有玩家可用 |
+| /fp sysinfo | 匯出 CPU、記憶體、磁碟、TPS 與假人狀態為 JSON | OP | 寫在 `plugins/FakePlayer-CE/sysinfo/`，可直接附到效能問題裡 |
 
 ## HTTP 管理介面
 
@@ -350,7 +354,7 @@ auto-login:
 
 ## 專案建置
 
-詳見 [BUILD_zh_TW.md](./BUILD_zh_TW.md)。該文件只適用於本專案的 Gradle 多模組流程，不能用於上游 Maven 架構。
+詳見 [BUILD_zh_TW.md](./docs/BUILD_zh_TW.md)。該文件只適用於本專案的 Gradle 多模組流程，不能用於上游 Maven 架構。
 
 ## Star 趨勢
 

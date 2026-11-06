@@ -66,9 +66,12 @@ def platform_versions_from_tag(tag):
 
     不能用目录名推断: 一个模块可以覆盖多个版本, 例如 v1_21_3 同时声明
     "1.21.2" 和 "1.21.3", v1_20_1 同时声明 "1.20" 和 "1.20.1"。
+
+    旧 tag (build9 及以前) 的模块放在仓库根目录 (fakeplayer-v1_20_1/...),
+    之后才收拢到 versions/ 下, 所以两条路径都要找。
     """
     out = subprocess.run(
-        ["git", "grep", "-h", "SUPPORTS = Set.of", tag, "--", "versions/"],
+        ["git", "grep", "-h", "SUPPORTS = Set.of", tag, "--", "versions/", "fakeplayer-v1_*"],
         capture_output=True, text=True,
     )
     if out.returncode != 0:
@@ -157,6 +160,63 @@ def publish_version(tag):
     sys.exit(f"创建 {tag} 失败 HTTP {status}: {text[:400]}")
 
 
+def check_links():
+    """校验 Hangar 上各版本记录的外链能不能真的下到文件。
+
+    外链模式 (externalUrl) 下 Hangar 不落文件, 也不计下载数, 写错了永远不会
+    报错, 只会给用户一条 404。所以判据是 HEAD 状态码, 而不是字符串比对:
+    历史上 build3~build16 的文件名多写了一层 fp., 后来在 Release 上补了同内容
+    的别名资产修正, 那条路仍然可用, 不该被判为异常。
+
+    记录值与 asset_url(tag) 不一致时单独提示, 提醒命名可能偏离约定。
+    """
+    entries, offset = [], 0
+    while True:  # Hangar 的 limit 上限是 25, 超过会被压回去, 只能翻页
+        status, text = http(f"{BASE}/projects/{PROJECT}/versions?limit=25&offset={offset}")
+        if status != 200:
+            sys.exit(f"读取版本列表失败 HTTP {status}: {text[:300]}")
+        page = json.loads(text)
+        batch = page["result"]
+        entries.extend(batch)
+        offset += len(batch)
+        if not batch or offset >= page["pagination"]["count"]:
+            break
+
+    ok, bad, skipped = [], [], []
+    for entry in entries:
+        tag = entry["name"]
+        downloads = entry.get("downloads") or {}
+        urls = [(p, (d or {}).get("externalUrl")) for p, d in downloads.items()]
+        urls = [(p, u) for p, u in urls if u]
+        if not urls:
+            skipped.append(tag)
+            continue
+        problems, warnings = [], []
+        for platform, url in urls:
+            code, _ = http(url, method="HEAD", timeout=30)
+            if code != 200:
+                problems.append(f"{platform} HTTP {code} {url}")
+            elif url != asset_url(tag):
+                warnings.append(f"{platform} 可下载但命名偏离约定: {url}")
+        (bad if problems else ok).append((tag, problems, warnings))
+
+    log(f"可下载 {len(ok)} / 不可下载 {len(bad)} / 无外链 {len(skipped)}")
+    warned = 0
+    for tag, problems, warnings in ok + bad:
+        if not problems and not warnings:
+            continue
+        log(f"\n[{tag}]")
+        for line in problems:
+            log(f"  错误: {line}")
+        for line in warnings:
+            log(f"  提示: {line}")
+            warned += 1
+    if warned:
+        log(f"\n{len(set(t for t, p, w in ok + bad if w))} 个版本命名偏离约定但可下载")
+    if bad:
+        sys.exit(1)
+
+
 def read_readme(path="README.md"):
     with open(path, encoding="utf-8") as f:
         return f.read()
@@ -202,9 +262,12 @@ if __name__ == "__main__":
     v = sub.add_parser("version")
     v.add_argument("--tag", required=True)
     sub.add_parser("page")
+    sub.add_parser("check")
     args = parser.parse_args()
 
     if args.mode == "version":
         publish_version(args.tag)
+    elif args.mode == "check":
+        check_links()
     else:
         sync_page()

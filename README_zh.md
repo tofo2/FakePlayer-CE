@@ -7,7 +7,7 @@
 [English](README.md) | 简体中文 | [繁體中文](README_zh_TW.md) | [日本語](README_ja.md)
 
 [![CI](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml/badge.svg)](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/EndlessPixel-Studio/FakePlayer-CE)](LICENSE.txt)
+[![License](https://img.shields.io/github/license/EndlessPixel-Studio/FakePlayer-CE)](LICENSE)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20~%2026.3-5fbb47)](https://github.com/EndlessPixel-Studio/FakePlayer-CE)
 [![Hangar](https://img.shields.io/badge/Hangar-FakePlayer--CE-1f7ae0)](https://hangar.papermc.io/EndlessPixel/FakePlayer-CE)
 [![Built with JDK 25](https://img.shields.io/badge/Built%20with-JDK%2025-ED8B00?logo=openjdk&logoColor=white)](https://www.java.com)
@@ -111,7 +111,8 @@
 | /fp turn | 假人原地转向 | fakeplayer.command.turn | |
 | /fp look | 假人看向指定坐标 | fakeplayer.command.look | |
 | /fp move | 假人定向移动 | fakeplayer.command.move | |
-| /fp goto | 让假人寻路前往指定坐标 | fakeplayer.command.goto | 自动寻路；无法抵达则拒绝；`/fp goto stop` 可中止 |
+| /fp goto | 让假人寻路前往指定坐标 | fakeplayer.command.goto | 自动寻路；无法抵达则拒绝 |
+| /fp gotostop | 中止正在进行的寻路 | fakeplayer.command.goto | 不影响其它动作 |
 | /fp ride | 假人骑乘实体 | fakeplayer.command.ride | |
 | /fp sneak | 假人进入潜行模式 | fakeplayer.command.sneak | |
 | /fp sprint | 假人疾跑 | fakeplayer.command.sprint | |
@@ -123,6 +124,9 @@
 | /fp password | 设置假人登录密码（存入插件数据库） | fakeplayer.command.password | 配合 `auto-login.command` 使用 |
 | /fp changepassword | 修改假人登录密码（旧密码可省略） | fakeplayer.command.changepassword | |
 | /fp reload | 重载插件配置文件 | OP | |
+| /fp update check | 检查 GitHub 上是否有新版本 | OP | |
+| /fp version | 显示插件、服务端与 Java 版本 | - | 所有玩家可用 |
+| /fp sysinfo | 导出 CPU、内存、磁盘、TPS 与假人状态为 JSON | OP | 写在 `plugins/FakePlayer-CE/sysinfo/`，可直接附到性能问题里 |
 
 ## HTTP 管理接口
 
@@ -350,7 +354,7 @@ auto-login:
 
 ## 项目构建
 
-详见 [BUILD_zh.md](./BUILD_zh.md)。该文档只适用于本项目的 Gradle 多模块流程，不能用于上游 Maven 架构。
+详见 [BUILD_zh.md](./docs/BUILD_zh.md)。该文档只适用于本项目的 Gradle 多模块流程，不能用于上游 Maven 架构。
 
 ## Star 趋势
 

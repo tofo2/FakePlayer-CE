@@ -7,7 +7,7 @@
 English | [简体中文](README_zh.md) | [繁體中文](README_zh_TW.md) | [日本語](README_ja.md)
 
 [![CI](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml/badge.svg)](https://github.com/EndlessPixel-Studio/FakePlayer-CE/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/EndlessPixel-Studio/FakePlayer-CE)](LICENSE.txt)
+[![License](https://img.shields.io/github/license/EndlessPixel-Studio/FakePlayer-CE)](LICENSE)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20~%2026.3-5fbb47)](https://github.com/EndlessPixel-Studio/FakePlayer-CE)
 [![Hangar](https://img.shields.io/badge/Hangar-FakePlayer--CE-1f7ae0)](https://hangar.papermc.io/EndlessPixel/FakePlayer-CE)
 [![Built with JDK 25](https://img.shields.io/badge/Built%20with-JDK%2025-ED8B00?logo=openjdk&logoColor=white)](https://www.java.com)
@@ -111,7 +111,8 @@ On first launch only a template `config.tmpl.yml` is generated; rename it to `co
 | /fp turn | Turn around | fakeplayer.command.turn | |
 | /fp look | Look at specified location | fakeplayer.command.look | |
 | /fp move | Move | fakeplayer.command.move | |
-| /fp goto | Walk to the specified coordinates | fakeplayer.command.goto | Pathfinds around obstacles; rejects unreachable targets; `/fp goto stop` cancels |
+| /fp goto | Walk to the specified coordinates | fakeplayer.command.goto | Pathfinds around obstacles; rejects unreachable targets |
+| /fp gotostop | Cancel an ongoing walk | fakeplayer.command.goto | Leaves other actions running |
 | /fp ride | Ride | fakeplayer.command.ride | |
 | /fp sneak | Sneak | fakeplayer.command.sneak | |
 | /fp sprint | Sprint | fakeplayer.command.sprint | |
@@ -123,6 +124,9 @@ On first launch only a template `config.tmpl.yml` is generated; rename it to `co
 | /fp password | Set fake player login password (stored in the plugin database) | fakeplayer.command.password | Used with `auto-login.command` |
 | /fp changepassword | Change fake player login password (old password optional) | fakeplayer.command.changepassword | |
 | /fp reload | Reload config | OP | |
+| /fp update check | Check GitHub for a newer build | OP | |
+| /fp version | Show plugin, server and Java version | - | Anyone |
+| /fp sysinfo | Dump CPU, memory, disk, TPS and fake player state to JSON | OP | Written to `plugins/FakePlayer-CE/sysinfo/`; attach it to performance reports |
 
 ## HTTP Admin API
 
@@ -350,7 +354,7 @@ auto-login:
 
 ## Build
 
-See [BUILD.md](./BUILD.md). It applies to this project's Gradle multi-module workflow only, not to the upstream Maven build.
+See [BUILD.md](./docs/BUILD.md). It applies to this project's Gradle multi-module workflow only, not to the upstream Maven build.
 
 ## Star History
 

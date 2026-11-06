@@ -4,11 +4,13 @@ plugins {
     // 静态分析: pmd 是 Gradle 核心插件 (无需声明版本), spotbugs 只对
     // fakeplayer-api / fakeplayer-core 启用; 其余模块 (版本模块) 未启用
     id("com.github.spotbugs") version "6.5.13" apply false
+    // 格式化: google-java-format, 只做校验 (spotlessCheck), 不自动改文件
+    id("com.diffplug.spotless") version "8.9.0" apply false
 }
 
 allprojects {
     group = "io.github.hello09x.fakeplayer"
-    version = "fp.build17"
+    version = "fp.build19"
 
     repositories {
         mavenCentral()
@@ -22,6 +24,15 @@ allprojects {
 
 subprojects {
     apply(plugin = "java")
+    apply(plugin = "com.diffplug.spotless")
+
+    extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+        java {
+            target("src/main/java/**/*.java", "src/test/java/**/*.java")
+            // 与命令行 google-java-format 的输出保持完全一致, 不叠加 removeUnusedImports
+            googleJavaFormat("1.28.0")
+        }
+    }
 
     java {
         // Java 25: Paper 26.x 的 paper-api 以 class file 69 (Java 25) 发布,
@@ -30,6 +41,17 @@ subprojects {
         targetCompatibility = JavaVersion.VERSION_25
         toolchain {
             languageVersion.set(JavaLanguageVersion.of(25))
+        }
+    }
+
+    // codebook-cli 1.0.14 (Remapping der Dev-Bundles) läuft nicht auf JDK 25.0.4+,
+    // deshalb nur für das Einrichten der Dev-Bundles ein JDK 21 verwenden.
+    // Entfernen, sobald paperweight eine korrigierte codebook-Version mitbringt.
+    pluginManager.withPlugin("io.papermc.paperweight.userdev") {
+        extensions.configure<io.papermc.paperweight.userdev.PaperweightUserExtension> {
+            javaLauncher = javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(21)
+            }
         }
     }
 
