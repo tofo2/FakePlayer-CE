@@ -159,6 +159,31 @@ prevent-kicking: ON_SPAWNING
 # Force running on unsupported Minecraft versions by ignoring the NMSBridge version check
 forced-execution: false
 
+# 新生成的假人是否先穿越一次维度 (用于获得刷怪能力)
+# 设为 false 可避免假人在传送失败时滞留在下界
+# Whether a freshly spawned fake player first hops to the other dimension (to gain mob spawning)
+# Set to false to avoid fake players being left in the Nether if the final teleport fails
+spawn-dimension-hop: true
+
+
+# ============================================================
+# 调试 / Debug
+# ============================================================
+
+# 是否输出调试日志
+# 开启后会记录假人生成时的传送过程 (带 [spawn-tp] 前缀): 出生点、目标位置、维度穿越结果、
+# 最终传送结果, 以及 100 tick 后的位置校验 (OK)
+# 传送失败、位置错误等警告无论是否开启都会输出
+# 同时会启用仅限 OP 的 /fp debug 开发者命令
+# 排查问题时再开启, 日常运行建议保持 false
+# Enable debug logging
+# Logs the spawn teleport of fake players (prefixed with [spawn-tp]): spawn point, target location,
+# dimension hop result, final teleport result, and the position check after 100 ticks (OK)
+# Warnings such as failed teleports or wrong positions are always logged, regardless of this setting
+# Also enables the OP-only /fp debug developer command
+# Turn it on only while troubleshooting, keep it false for normal operation
+debug: false
+
 
 # ============================================================
 # 共享假人 / Share fake players

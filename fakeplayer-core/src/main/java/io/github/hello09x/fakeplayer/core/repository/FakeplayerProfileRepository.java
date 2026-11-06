@@ -42,32 +42,39 @@ public class FakeplayerProfileRepository {
         .orElse(null);
   }
 
+  /**
+   * Sucht ein Profil nach Namen, ohne Beachtung von Groß-/Kleinschreibung. Ein exakter Treffer hat
+   * Vorrang, damit bestehende Einträge, die sich nur in der Schreibweise unterscheiden, weiterhin
+   * getrennt aufgelöst werden.
+   */
   public @Nullable FakePlayerProfile selectByName(@NotNull String name) {
-    var sql = "SELECT * FROM fake_player_profile WHERE name = ?";
-    return jdbc.queryForObject(sql, FakePlayerProfile.FakePlayerProfileRowMapper.instance, name);
+    var sql =
+        "SELECT * FROM fake_player_profile WHERE name = ? COLLATE NOCASE ORDER BY (name = ?) DESC, id ASC LIMIT 1";
+    return jdbc.queryForObject(
+        sql, FakePlayerProfile.FakePlayerProfileRowMapper.instance, name, name);
   }
 
   private void initTables() {
     jdbc.execute(
         """
-        create table if not exists fake_player_profile
-        (
-            id   integer  not null primary key autoincrement,
-            name text(32) not null,
-            uuid text(36) not null
-        );
-        """);
+                create table if not exists fake_player_profile
+                (
+                    id   integer  not null primary key autoincrement,
+                    name text(32) not null,
+                    uuid text(36) not null
+                );
+                """);
 
     jdbc.execute(
         """
-        create unique index if not exists fake_player_profile_name
-                   on fake_player_profile (name);
-        """);
+                create unique index if not exists fake_player_profile_name
+                           on fake_player_profile (name);
+                """);
 
     jdbc.execute(
         """
-        create unique index if not exists fake_player_profile_uuid
-                   on fake_player_profile (uuid);
-        """);
+                create unique index if not exists fake_player_profile_uuid
+                           on fake_player_profile (uuid);
+                """);
   }
 }
