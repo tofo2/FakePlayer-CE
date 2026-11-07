@@ -127,6 +127,7 @@ On first launch only a template `config.tmpl.yml` is generated; rename it to `co
 | /fp update check | Check GitHub for a newer build | OP | |
 | /fp version | Show plugin, server and Java version | - | Anyone |
 | /fp sysinfo | Dump CPU, memory, disk, TPS and fake player state to JSON | OP | Written to `plugins/FakePlayer-CE/sysinfo/`; attach it to performance reports |
+| /fp lang | Switch your display language | - | Anyone; overrides the client language |
 
 ## HTTP Admin API
 
@@ -281,7 +282,7 @@ Features: `fakeplayer.config.replenish`, `fakeplayer.config.replenish.chest` (re
 
 ## Custom Translation
 
-Built-in locales: `en`, `zh`, `zh_tw`, `zh_hk`, `ja`. Switch with `i18n.locale` in `config.yml` (then `/fp reload`).
+Built-in locales: `en`, `zh`, `zh_tw`, `zh_hk`, `ja`. Switch with `i18n.locale` in `config.yml` (then `/fp reload`), or per player with `/fp lang <code>` (e.g. `/fp lang ja`; `/fp lang reset` returns to the client language).
 
 Custom: drop `message_<language>_<region>.properties` (copy the [template](fakeplayer-core/src/main/resources/message/message.properties)) into `plugins/fakeplayer/message/`, set `i18n.locale` to the matching suffix (e.g. `en_us`), and run `/fp reload-translation`. Files must be **UTF-8** encoded.
 
@@ -351,6 +352,21 @@ auto-login:
 ```
 
 > Use a strong password so AuthMe's security policy does not reject it.
+
+### Fake players are missing from the MOTD / player count on Velocity
+
+The plugin only runs on the backend server. The proxy answers the server-list ping on its own, so fake players never appear in that count. Enable ping passthrough in `velocity.toml`:
+
+```toml
+ping-passthrough = "ALL"
+```
+
+A few notes:
+
+- `DESCRIPTION` is not enough. It only forwards the MOTD and keeps the proxy's own player count; `ALL` takes the whole response from the backend.
+- The number comes from the first backend that answers the `try` list, not the sum across all backends.
+- The tab list already works and needs no config: fake players are injected through the regular player list, so they show up in tab, in `/list` and in the backend's own ping. A proxy-side plugin that builds a global player list on the proxy (TAB v3 running on Velocity) cannot see them, because they are not real proxy connections.
+- Cross-server `follow-quiting` needs no extra setup: the plugin detects `proxies.velocity.enabled` in `config/paper-global.yml`, so switching servers no longer counts as quitting.
 
 ## Build
 

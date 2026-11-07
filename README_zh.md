@@ -127,6 +127,7 @@
 | /fp update check | 检查 GitHub 上是否有新版本 | OP | |
 | /fp version | 显示插件、服务端与 Java 版本 | - | 所有玩家可用 |
 | /fp sysinfo | 导出 CPU、内存、磁盘、TPS 与假人状态为 JSON | OP | 写在 `plugins/FakePlayer-CE/sysinfo/`，可直接附到性能问题里 |
+| /fp lang | 切换你的显示语言 | - | 所有玩家可用；优先于客户端语言 |
 
 ## HTTP 管理接口
 
@@ -281,7 +282,7 @@ curl -G -H "Authorization: Bearer $TOKEN" "$API/say" --data-urlencode "name=klmg
 
 ## 自定义本地化翻译
 
-内置 `en` / `zh` / `zh_tw` / `zh_hk` / `ja`，改 `config.yml` 的 `i18n.locale` 切换（之后 `/fp reload`）。
+内置 `en` / `zh` / `zh_tw` / `zh_hk` / `ja`，改 `config.yml` 的 `i18n.locale` 切换（之后 `/fp reload`）；也可以按玩家覆盖：`/fp lang <代码>`（如 `/fp lang ja`），`/fp lang reset` 回到客户端语言。
 
 自定义：在 `plugins/fakeplayer/message/` 放入 `message_<语言>_<地区>.properties`（复制[模板](fakeplayer-core/src/main/resources/message/message.properties)后改），把 `i18n.locale` 设为对应后缀（如 `zh_cn`），执行 `/fp reload-translation` 生效。文件必须使用 **UTF-8** 编码。
 
@@ -351,6 +352,21 @@ auto-login:
 ```
 
 > 请用足够强的密码，避免被 AuthMe 安全策略拦截。
+
+### Velocity 下 MOTD / 在线人数看不到假人
+
+插件只装在子服上，而服务器的 MOTD 是代理端自己应答的，假人根本到不了那一层。在 `velocity.toml` 里打开 ping 透传：
+
+```toml
+ping-passthrough = "ALL"
+```
+
+几点说明：
+
+- 填 `DESCRIPTION` 不够。它只透传 MOTD，在线人数仍用代理自己的；`ALL` 才是整份透传后端的应答。
+- 人数取自 `try` 列表里第一个应答的后端，不是所有后端之和。
+- Tab 列表本来就能看到，不需要配置：假人是走正常玩家列表注入的，所以 tab、`/list`、后端自己的 ping 里都有。但在代理端构建「全局玩家列表」的插件（比如装在 Velocity 上的 TAB v3）看不到它们——那些假人不是真正的代理连接。
+- 跨服时 `follow-quiting` 不用额外配置：插件会读 `config/paper-global.yml` 的 `proxies.velocity.enabled`，切服不再被当成下线。
 
 ## 项目构建
 
