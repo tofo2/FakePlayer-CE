@@ -277,7 +277,20 @@ public class Fakeplayer {
                       var teleport = this.teleportToSpawnpoint(option.spawnAt().clone());
                       if (option.simulationDistance() >= 0) {
                         // 玩家进入世界后再设置, 否则区块追踪还没有建立
-                        this.player.setSimulationDistance(option.simulationDistance());
+                        // Ansichtsdistanz an die Simulationsdistanz koppeln, damit der Bot keine
+                        // Chunks ausserhalb seines Radius haelt (setupClientOptions nutzt sonst
+                        // die Server-Ansichtsdistanz).
+                        var distance = Math.max(2, option.simulationDistance());
+                        this.player.setSimulationDistance(distance);
+                        this.player.setViewDistance(distance);
+                        debug(
+                            "%s: distances set -> simulation=%d (requested %d), view=%d, server view=%d"
+                                .formatted(
+                                    name,
+                                    this.player.getSimulationDistance(),
+                                    option.simulationDistance(),
+                                    this.player.getViewDistance(),
+                                    Bukkit.getViewDistance()));
                       }
                       teleport.whenComplete((ignored, error) -> this.ticker.run());
                     }))
@@ -448,6 +461,12 @@ public class Fakeplayer {
               } else {
                 logger.warning("[spawn-tp] " + message);
               }
+              debug(
+                  "%s: distances after 100 ticks -> simulation=%d, view=%d"
+                      .formatted(
+                          name,
+                          this.player.getSimulationDistance(),
+                          this.player.getViewDistance()));
             },
             null,
             100L);
