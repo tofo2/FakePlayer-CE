@@ -143,8 +143,12 @@ public enum Feature implements Translatable, Singletons {
       faker -> String.valueOf(faker.getSimulationDistance()),
       (faker, value) -> {
         var distance = Integer.parseInt(value);
-        faker.setSimulationDistance(
-            distance >= 0 ? distance : faker.getWorld().getSimulationDistance());
+        // Ansichtsdistanz mitsetzen, damit der Bot keine Chunks ausserhalb seines Radius haelt.
+        // -1 stellt beide Werte auf die Weltwerte zurueck.
+        var simulation = distance >= 0 ? distance : faker.getWorld().getSimulationDistance();
+        var view = distance >= 0 ? Math.max(2, distance) : faker.getWorld().getViewDistance();
+        faker.setSimulationDistance(simulation);
+        faker.setViewDistance(view);
       }),
   ;
 
