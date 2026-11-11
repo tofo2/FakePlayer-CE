@@ -282,7 +282,7 @@ public class Fakeplayer {
                         // die Server-Ansichtsdistanz).
                         var distance = Math.max(2, option.simulationDistance());
                         this.player.setSimulationDistance(distance);
-                        this.player.setViewDistance(distance);
+                        //this.player.setViewDistance(distance);
                         debug(
                             "%s: distances set -> simulation=%d (requested %d), view=%d, server view=%d"
                                 .formatted(
