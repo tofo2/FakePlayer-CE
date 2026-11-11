@@ -2,7 +2,7 @@ name: Build test branch
 
 on:
   push:
-    branches: [test-no-dimension-hop]
+    branches: [local]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
