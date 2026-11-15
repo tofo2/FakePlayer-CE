@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.plugin.Plugin;
 
 /** 按插件配置的语言解析帮助文案; 未翻译的键返回键本身。 */
+/** Resolves command help text once with the locale configured by the plugin. */
 final class CommandHelpLocalizer {
 
   private static final String BUNDLE_PATH = "message/message";

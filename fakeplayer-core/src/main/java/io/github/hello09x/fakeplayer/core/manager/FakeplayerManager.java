@@ -26,6 +26,7 @@ import io.github.hello09x.fakeplayer.core.manager.naming.NameManager;
 import io.github.hello09x.fakeplayer.core.repository.model.Feature;
 import io.github.hello09x.fakeplayer.core.util.AddressUtils;
 import io.github.hello09x.fakeplayer.core.util.Commands;
+import io.github.hello09x.fakeplayer.core.util.OfflineCreator;
 import io.github.hello09x.fakeplayer.core.util.Reflections;
 import io.github.hello09x.fakeplayer.core.util.Schedulers;
 import java.lang.reflect.Method;
@@ -306,12 +307,36 @@ public class FakeplayerManager {
   public @Nullable String getCreatorName(@NotNull Player target) {
     return Optional.ofNullable(this.playerList.getByUUID(target.getUniqueId()))
         .map(Fakeplayer::getCreator)
-        .map(CommandSender::getName)
+        .map(
+            creator -> {
+              if (creator instanceof OfflineCreator offline && offline.getUniqueId() != null) {
+                var current = Bukkit.getOfflinePlayer(offline.getUniqueId()).getName();
+                if (current != null && !current.isBlank()) {
+                  return current;
+                }
+              }
+              return creator.getName();
+            })
+        .orElse(null);
+  }
+
+  /**
+   * 获取一个假人的创建者 UUID, 未知 (例如控制台创建) 或者这个玩家不是假人时为 {@code null}
+   *
+   * @param target 假人
+   * @return 创建者 UUID
+   */
+  public @Nullable UUID getCreatorUuid(@NotNull Player target) {
+    return Optional.ofNullable(this.playerList.getByUUID(target.getUniqueId()))
+        .map(Fakeplayer::getCreator)
+        .map(FakeplayerList::creatorUuid)
         .orElse(null);
   }
 
   /**
    * 获取假人的创建者
+   *
+   * <p>创建者是离线代理且 UUID 已知时, 如果该玩家在线则返回在线的真实玩家, 这样权限检查和消息都能正常工作。
    *
    * @param target 假人
    * @return 创建者
@@ -323,9 +348,14 @@ public class FakeplayerManager {
             creator -> {
               if (creator instanceof Player p) {
                 return Bukkit.getPlayer(p.getUniqueId());
-              } else {
-                return creator;
               }
+              if (creator instanceof OfflineCreator offline && offline.getUniqueId() != null) {
+                var online = Bukkit.getPlayer(offline.getUniqueId());
+                if (online != null) {
+                  return online;
+                }
+              }
+              return creator;
             })
         .orElse(null);
   }

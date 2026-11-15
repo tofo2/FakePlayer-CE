@@ -44,6 +44,19 @@ subprojects {
         }
     }
 
+    // codebook-cli 1.0.14 (Remapping der Dev-Bundles) läuft nicht auf JDK 25.0.4+,
+    // deshalb nur für das Einrichten der Dev-Bundles ein JDK 21 verwenden.
+    // Entfernen, sobald paperweight eine korrigierte codebook-Version mitbringt.
+    pluginManager.withPlugin("io.papermc.paperweight.userdev") {
+        if (name.startsWith("fakeplayer-v1_")) {
+            extensions.configure<io.papermc.paperweight.userdev.PaperweightUserExtension> {
+                javaLauncher = javaToolchains.launcherFor {
+                    languageVersion = JavaLanguageVersion.of(21)
+                }
+            }
+        }
+    }
+
     dependencies {
         compileOnly("org.projectlombok:lombok:1.18.48")
         annotationProcessor("org.projectlombok:lombok:1.18.48")

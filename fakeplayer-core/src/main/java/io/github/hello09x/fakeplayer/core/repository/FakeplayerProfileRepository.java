@@ -42,9 +42,16 @@ public class FakeplayerProfileRepository {
         .orElse(null);
   }
 
+  /**
+   * Sucht ein Profil nach Namen, ohne Beachtung von Groß-/Kleinschreibung. Ein exakter Treffer hat
+   * Vorrang, damit bestehende Einträge, die sich nur in der Schreibweise unterscheiden, weiterhin
+   * getrennt aufgelöst werden.
+   */
   public @Nullable FakePlayerProfile selectByName(@NotNull String name) {
-    var sql = "SELECT * FROM fake_player_profile WHERE name = ?";
-    return jdbc.queryForObject(sql, FakePlayerProfile.FakePlayerProfileRowMapper.instance, name);
+    var sql =
+        "SELECT * FROM fake_player_profile WHERE name = ? COLLATE NOCASE ORDER BY (name = ?) DESC, id ASC LIMIT 1";
+    return jdbc.queryForObject(
+        sql, FakePlayerProfile.FakePlayerProfileRowMapper.instance, name, name);
   }
 
   private void initTables() {
