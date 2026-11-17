@@ -18,11 +18,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check command args
+        run: python3 .github/scripts/check_command_args.py
+
   build:
     name: Build
+    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
       - uses: actions/checkout@v7
 
@@ -34,9 +43,12 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-      - name: Build with Gradle
-        run: ./gradlew :fakeplayer-dist:shadowJar --build-cache --parallel --console=plain
+      - name: Build
+        run: ./gradlew spotlessCheck :fakeplayer-dist:shadowJar --build-cache --configuration-cache --parallel --console=plain
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
