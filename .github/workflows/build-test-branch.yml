@@ -48,7 +48,7 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Build
-        run: ./gradlew spotlessCheck :fakeplayer-dist:shadowJar --build-cache --configuration-cache --parallel --console=plain
+        run: ./gradlew spotlessCheck :fakeplayer-dist:shadowJar --build-cache --configuration-cache --parallel --console=plain -Dorg.gradle.workers.max=2
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
